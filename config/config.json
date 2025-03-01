@@ -1,0 +1,34 @@
+{
+    "simulation": {
+        "oneDayTimeSteps": 57600,
+        "simDay": 3,
+        "numCell": 8000,
+        "lightIndexInterval": 800
+    },
+    "logging": {
+        "intervalWriteToLog": 1200,
+        "intervalWriteOtherData": 14400
+    },
+    "demand": {
+        "multiplier": 40000,
+        "fixedNum": 0,
+        "dayRandomDisRange": 0,
+        "randomDisRange": 0
+    },
+    "vehicle": {
+        "numClosedVehicle": 100
+    },
+    "trafficLight": {
+        "initPhaseInterval": 40,
+        "changes": [
+            {
+                "day": 2,
+                "multiplier": 2
+            },
+            {
+                "day": 3,
+                "multiplier": 2
+            }
+        ]
+    }
+} 

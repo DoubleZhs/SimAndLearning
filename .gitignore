@@ -1,0 +1,14 @@
+# Go 的临时文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDE 文件
+.idea/
+.vscode/
+*.swp
+*.swo
