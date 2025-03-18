@@ -1,0 +1,8 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+.csv
+.log
+.log.gz
+.log.gz.1
+.log.gz.2
+.log.gz.3
+.log.gz.4

@@ -55,6 +55,17 @@ type TraceConfig struct {
 	// 检查点数量（每辆车记录的位置点数量）
 	// 如果不设置或设置为0，系统将根据路径长度自动确定合适的检查点数量
 	CheckpointInterval int `json:"checkpointInterval"`
+	// 轨迹数据写入间隔（时间步），独立于其他数据的写入间隔
+	WriteInterval int `json:"writeInterval"`
+	// 内存管理相关配置
+	// 最大缓存条目数，超过此值触发写入
+	MaxCacheSize int `json:"maxCacheSize"`
+	// 内存使用阈值(MB)，超过此值触发写入
+	MemoryThreshold int `json:"memoryThreshold"`
+	// 是否启用内存监控
+	EnableMemoryMonitor bool `json:"enableMemoryMonitor"`
+	// 内存监控检查间隔(记录次数)
+	MemoryCheckInterval int `json:"memoryCheckInterval"`
 }
 
 var globalConfig *Config
@@ -75,8 +86,28 @@ func LoadConfig(filename string) error {
 	if config.Trace.CheckpointInterval <= 0 {
 		config.Trace.CheckpointInterval = 10 // 默认每辆车记录10个点
 	}
-	// 默认启用轨迹记录，除非明确禁用
-	// 这保证了向后兼容性
+
+	// 为新添加的配置项设置默认值
+	if config.Trace.WriteInterval <= 0 {
+		config.Trace.WriteInterval = config.Logging.IntervalWriteOtherData // 默认与其他数据写入间隔相同
+	}
+
+	if config.Trace.MaxCacheSize <= 0 {
+		config.Trace.MaxCacheSize = 10000 // 默认缓存10000条记录
+	}
+
+	if config.Trace.MemoryThreshold <= 0 {
+		config.Trace.MemoryThreshold = 500 // 默认500MB
+	}
+
+	if config.Trace.MemoryCheckInterval <= 0 {
+		config.Trace.MemoryCheckInterval = 1000 // 默认每1000次记录检查一次
+	}
+
+	// 默认启用内存监控
+	if !config.Trace.EnableMemoryMonitor {
+		config.Trace.EnableMemoryMonitor = true
+	}
 
 	globalConfig = config
 	return nil

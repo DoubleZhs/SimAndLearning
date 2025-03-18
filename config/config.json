@@ -12,8 +12,8 @@
     "demand": {
         "multiplier": 40000,
         "fixedNum": 0,
-        "dayRandomDisRange": 0,
-        "randomDisRange": 0
+        "dayRandomDisRange": 0.1,
+        "randomDisRange": 0.2
     },
     "vehicle": {
         "numClosedVehicle": 100
@@ -33,6 +33,11 @@
     },
     "trace": {
         "enabled": true,
-        "checkpointInterval": 10
+        "checkpointInterval": 20,
+        "writeInterval": 4800,
+        "maxCacheSize": 100000,
+        "memoryThreshold": 50000,
+        "enableMemoryMonitor": true,
+        "memoryCheckInterval": 1200
     }
 } 

@@ -69,7 +69,12 @@ func CreateCycleGraph(cellNum int, trafficLightInterval int, initInterval int) (
 			)
 
 			// 随机设置初始计数，使红绿灯初始相位随机分布
-			light.SetCount(rand.IntN(initInterval))
+			// 确保计数值在1到interval之间，避免无效值
+			randomCount := 1
+			if initInterval > 1 {
+				randomCount = rand.IntN(initInterval-1) + 1 // 生成1到initInterval之间的随机数
+			}
+			light.SetCount(randomCount)
 
 			node = light
 			lights[int64(i)] = light

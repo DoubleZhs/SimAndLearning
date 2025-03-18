@@ -124,18 +124,19 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node, traceN
 			// 将车辆加入缓冲区
 			vehicle.BufferIn(0)
 
-			// 仅在启用轨迹记录时设置检查点
+			// 仅在启用轨迹记录时设置轨迹参数
 			if traceEnabled {
-				SetupVehicleCheckpoints(vehicle, 0) // 使用0表示使用默认间隔
+				SetupVehicleTrace(vehicle, 0) // 使用默认间隔
 			}
 
-			// 添加到等待队列
-			waitingVehiclesMutex.Lock()
-			waitingVehicles[vehicle] = struct{}{}
-			waitingVehiclesMutex.Unlock()
-
-			// 更新等待车辆计数
-			atomic.AddInt64(&numVehiclesWaiting, 1)
+			// 更新车辆激活状态
+			if vehicle.UpdateActiveState() {
+				vehicle.SystemIn()
+				activeVehiclesMutex.Lock()
+				activeVehicles[vehicle] = struct{}{}
+				activeVehiclesMutex.Unlock()
+				atomic.AddInt64(&numVehiclesActive, 1)
+			}
 		}()
 	}
 	wg.Wait()
@@ -222,9 +223,9 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 			// 将车辆加入缓冲区
 			vehicle.BufferIn(simTime)
 
-			// 仅在启用轨迹记录时设置检查点
+			// 仅在启用轨迹记录时设置轨迹参数
 			if traceEnabled {
-				SetupVehicleCheckpoints(vehicle, 0) // 使用0表示使用默认间隔
+				SetupVehicleTrace(vehicle, 0) // 使用默认间隔
 			}
 
 			// 添加到等待队列

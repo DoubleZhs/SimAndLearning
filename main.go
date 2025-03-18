@@ -291,68 +291,34 @@ func runSimulation(cfg *config.Config, g *simple.DirectedGraph, nodes []graph.No
 
 	simDaySteps := cfg.Simulation.SimDay * cfg.Simulation.OneDayTimeSteps
 
-	// 创建停止周期性轨迹记录的通道
-	traceRecordingStopChan := make(chan struct{})
-
-	// 根据配置决定是否启动轨迹记录
-	if cfg.Trace.Enabled {
-		// 启动周期性轨迹记录（后台运行）
-		// 设置固定的扫描间隔
-		traceRecordInterval := 1200 // 固定值，不再从配置中读取
-		log.WriteLog(fmt.Sprintf("Trace recording enabled. Record interval: %d", traceRecordInterval))
-
-		go recorder.PeriodicTraceRecording(traceRecordInterval, nodes, traceRecordingStopChan)
-	} else {
-		log.WriteLog("Trace recording disabled in configuration")
-	}
-
-	// 确保在函数返回时停止轨迹记录
-	defer func() {
-		close(traceRecordingStopChan)
-	}()
-
-	// 设置快照间隔的固定值
-	snapshotInterval := 57600 // 固定值，不再从配置中读取
-	log.WriteLog(fmt.Sprintf("Snapshot interval: %d", snapshotInterval))
-
-	// 创建异步写入函数
-	writeDataAsync := func() {
-		select {
-		case dataWriteChan <- struct{}{}:
-			if pool.Submit(func() {
-				defer func() {
-					select {
-					case <-dataWriteChan:
-					default:
-						// 防止在通道已关闭的情况下出现panic
-					}
-				}()
-
-				// 处理数据写入过程中的panic
-				defer func() {
-					if r := recover(); r != nil {
-						log.WriteLog(fmt.Sprintf("Panic occurred during data write: %v", r))
-					}
-				}()
-
-				recorder.WriteToSystemDataCSV(dataFiles["system"])
-				// 仅在启用轨迹记录时写入轨迹数据
-				if cfg.Trace.Enabled {
-					recorder.WriteToTraceDataCSV(dataFiles["trace"])
-				}
-				recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
-			}) {
-				// 提交成功
-			} else {
-				// 工作池已关闭，手动释放信号量
-				<-dataWriteChan
-				log.WriteLog("Warning: Worker pool closed, data write task not submitted")
+	// 创建同步写入函数替代异步写入
+	writeData := func(writeTrace bool) {
+		// 处理数据写入过程中的panic
+		defer func() {
+			if r := recover(); r != nil {
+				log.WriteLog(fmt.Sprintf("Panic occurred during data write: %v", r))
 			}
-		default:
-			// 如果上一次写入还未完成，跳过本次写入
-			log.WriteLog("Warning: Previous data write not completed, skipping current write")
+		}()
+
+		// 直接写入数据，不使用工作池和通道
+		recorder.WriteToSystemDataCSV(dataFiles["system"])
+
+		// 仅在需要时写入轨迹数据
+		if writeTrace && cfg.Trace.Enabled {
+			recorder.WriteToTraceDataCSV(dataFiles["trace"])
 		}
+
+		recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
+
+		// 手动触发垃圾回收以减少内存占用
+		runtime.GC()
 	}
+
+	// 更新trace recorder配置
+	recorder.UpdateConfig()
+
+	// 初始化计数器，用于跟踪上次trace写入时间
+	lastTraceWriteStep := 0
 
 	// 模拟主循环
 	for timeStep := 0; timeStep < simDaySteps; timeStep++ {
@@ -390,11 +356,6 @@ func runSimulation(cfg *config.Config, g *simple.DirectedGraph, nodes []graph.No
 		// 处理车辆移动
 		simulator.VehicleProcess(runtime.GOMAXPROCS(0), timeStep, g, traceNodes)
 
-		// 仅当启用轨迹记录时，才执行快照记录
-		if cfg.Trace.Enabled && timeStep > 0 && timeStep%snapshotInterval == 0 {
-			recorder.ScanNetworkForVehicles(timeStep, nodes, "snapshot")
-		}
-
 		// 更新系统状态
 		sysState.Update(nodes, numNodes, avgLane)
 		sysState.RecordData(timeStep)
@@ -404,60 +365,56 @@ func runSimulation(cfg *config.Config, g *simple.DirectedGraph, nodes []graph.No
 			sysState.LogStatus(currentDay, timeOfDay)
 		}
 
-		// 按间隔异步写入数据
+		// 检查是否应该写入trace数据（使用独立的写入间隔）
+		needWriteTrace := false
+		if cfg.Trace.Enabled && cfg.Trace.WriteInterval > 0 {
+			if timeStep-lastTraceWriteStep >= cfg.Trace.WriteInterval {
+				needWriteTrace = true
+				lastTraceWriteStep = timeStep
+			}
+		}
+
+		// 按间隔写入系统和车辆数据
 		if timeOfDay%cfg.Logging.IntervalWriteOtherData == 0 {
-			writeDataAsync()
+			// 只在需要时写入trace数据
+			writeData(needWriteTrace)
+		} else if needWriteTrace {
+			// 如果只需要写入trace数据
+			writeData(true)
 		}
 	}
 
-	// 在模拟结束时执行一次最终数据写入
-	writeDataAsync()
+	// 在模拟结束时执行一次最终数据写入，确保所有数据写入
+	writeData(true)
 
-	// 确保最后的数据写入任务完成
-	// 等待信号量释放，表示任务已完成
-	timeout := time.After(5 * time.Second)
-	select {
-	case <-timeout:
-		log.WriteLog("Warning: Timeout waiting for final data write to complete")
-	case <-dataWriteChan:
-		// 信号量被释放，表示写入已完成
-		// 立即放回信号量以避免死锁
-		select {
-		case dataWriteChan <- struct{}{}:
-		default:
-		}
-	}
+	// 不再需要等待信号量，直接进入finishSimulation
 }
 
 // 完成模拟，写入最后的数据
 func finishSimulation(pool *WorkerPool, dataFiles map[string]string) {
 	log.WriteLog("Writing final data...")
 
-	// 创建等待组以确保最后的数据写入完成
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	// 直接在主线程中执行最后的写入操作
+	// 处理数据写入过程中的panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.WriteLog(fmt.Sprintf("Panic occurred during final data write: %v", r))
+		}
+	}()
 
-	// 提交最后的写入任务
-	if !pool.Submit(func() {
-		defer wg.Done()
+	// 确保最后trace recorder配置被更新
+	recorder.UpdateConfig()
 
-		// 处理数据写入过程中的panic
-		defer func() {
-			if r := recover(); r != nil {
-				log.WriteLog(fmt.Sprintf("Panic occurred during final data write: %v", r))
-			}
-		}()
+	// 同步执行数据写入
+	startTime := time.Now()
 
-		recorder.WriteToSystemDataCSV(dataFiles["system"])
-		recorder.WriteToTraceDataCSV(dataFiles["trace"])
-		recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
-	}) {
-		// 如果提交失败，手动将等待组计数减一
-		wg.Done()
-		log.WriteLog("Warning: Final data write task not submitted, worker pool may be closed")
-	}
+	recorder.WriteToSystemDataCSV(dataFiles["system"])
+	recorder.WriteToTraceDataCSV(dataFiles["trace"])
+	recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
 
-	// 等待最后的数据写入完成
-	wg.Wait()
-	log.WriteLog("Final data write completed")
+	elapsedTime := time.Since(startTime)
+	log.WriteLog(fmt.Sprintf("Final data write completed in %v", elapsedTime))
+
+	// 手动触发垃圾回收以释放内存
+	runtime.GC()
 }
