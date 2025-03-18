@@ -9,24 +9,28 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 var (
-	traceDataCache [][][]string // 轨迹数据缓存
-	traceDataMutex sync.RWMutex // 使用读写锁保护并发访问
+	traceDataCache  [][][]string // 轨迹数据缓存
+	traceDataMutex  sync.RWMutex // 使用读写锁保护并发访问
+	traceDirPath    string       // 轨迹数据子文件夹路径
+	traceDirCreated atomic.Bool  // 标记目录是否已创建
 
 	// 内存监控相关变量
 	recordCount int32 = 0 // 记录计数器，用于定期检查内存占用
 	isWriting   int32 = 0 // 写入状态标志，避免并发写入
 
 	// 配置参数，会在初始化时从config包读取
-	maxCacheSize        int  // 最大缓存条目数，仅用于初始化时的容量预分配，不再用于触发写入
-	memoryThresholdMB   int  // 内存阈值(MB)，超过此值触发写入
-	memoryCheckInterval int  // 内存检查间隔(记录次数)
-	enableMemMonitor    bool // 是否启用内存监控
+	maxCacheSize        int         // 最大缓存条目数，仅用于初始化时的容量预分配，不再用于触发写入
+	memoryThresholdMB   int         // 内存阈值(MB)，超过此值触发写入
+	memoryCheckInterval int         // 内存检查间隔(记录次数)
+	enableMemMonitor    bool        // 是否启用内存监控
+	splitByDay          bool = true // 是否按天拆分轨迹数据
 )
 
 // 初始化函数，从配置加载内存管理参数
@@ -53,6 +57,8 @@ func UpdateConfig() {
 	memoryThresholdMB = cfg.Trace.MemoryThreshold
 	memoryCheckInterval = cfg.Trace.MemoryCheckInterval
 	enableMemMonitor = cfg.Trace.EnableMemoryMonitor
+	// 从配置中读取splitByDay
+	splitByDay = cfg.Trace.SplitByDay
 
 	// 如果缓存容量不足，进行扩容 - 保留这个逻辑，但仅用于预分配空间
 	if cap(traceDataCache) < maxCacheSize && len(traceDataCache) < maxCacheSize/2 {
@@ -62,8 +68,54 @@ func UpdateConfig() {
 		traceDataCache = newCache
 	}
 
-	log.WriteLog(fmt.Sprintf("Trace recorder config updated: memThreshold=%dMB, checkInterval=%d, memMonitor=%v, cacheCapacity=%d",
-		memoryThresholdMB, memoryCheckInterval, enableMemMonitor, cap(traceDataCache)))
+	log.WriteLog(fmt.Sprintf("Trace recorder config updated: memThreshold=%dMB, checkInterval=%d, memMonitor=%v, splitByDay=%v, cacheCapacity=%d",
+		memoryThresholdMB, memoryCheckInterval, enableMemMonitor, splitByDay, cap(traceDataCache)))
+}
+
+// setupTraceDataDirectory 创建轨迹数据子文件夹
+func setupTraceDataDirectory(baseFilename string) (string, error) {
+	// 已经创建过目录，直接返回
+	if traceDirCreated.Load() && traceDirPath != "" {
+		return traceDirPath, nil
+	}
+
+	// 提取文件名主体部分，不包含扩展名
+	baseName := filepath.Base(baseFilename)
+	baseName = strings.TrimSuffix(baseName, filepath.Ext(baseName))
+
+	// 创建子文件夹路径
+	dirPath := filepath.Join("./data", baseName)
+
+	// 检查目录是否存在，不存在则创建
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			return "", fmt.Errorf("failed to create trace data directory: %v", err)
+		}
+		log.WriteLog(fmt.Sprintf("Created trace data directory: %s", dirPath))
+	}
+
+	// 更新全局变量
+	traceDirPath = dirPath
+	traceDirCreated.Store(true)
+
+	return dirPath, nil
+}
+
+// getDayFromTimeStep 根据时间步骤计算天数
+func getDayFromTimeStep(timeStep int) int {
+	cfg := config.GetConfig()
+	if cfg == nil {
+		// 默认一天86400步
+		return timeStep/86400 + 1
+	}
+
+	// 使用配置中的一天时间步数
+	oneDaySteps := cfg.Simulation.OneDayTimeSteps
+	if oneDaySteps <= 0 {
+		oneDaySteps = 86400 // 默认值
+	}
+
+	return timeStep/oneDaySteps + 1
 }
 
 // TracePoint 表示轨迹中的一个记录点
@@ -225,7 +277,35 @@ func InitTraceDataCSV(filename string) {
 	header := []string{
 		"VehicleID", "Time", "PosID",
 	}
-	initializeCSV(filename, header)
+
+	// 仅当不按天拆分时创建整体记录文件
+	if !splitByDay {
+		initializeCSV(filename, header)
+	}
+
+	// 创建轨迹数据子文件夹
+	if splitByDay {
+		dirPath, err := setupTraceDataDirectory(filename)
+		if err != nil {
+			log.WriteLog(fmt.Sprintf("Warning: Failed to create trace data directory: %v", err))
+		} else {
+			// 初始化每天的轨迹数据文件
+			cfg := config.GetConfig()
+			if cfg != nil {
+				simDays := cfg.Simulation.SimDay
+				if simDays <= 0 {
+					simDays = 3 // 默认3天
+				}
+
+				for day := 1; day <= simDays; day++ {
+					dayFilename := filepath.Join(dirPath, fmt.Sprintf("day_%d.csv", day))
+					initializeCSV(dayFilename, header)
+				}
+			}
+
+			log.WriteLog(fmt.Sprintf("Trace data will be written to daily files in %s", dirPath))
+		}
+	}
 
 	// 更新配置
 	UpdateConfig()
@@ -282,9 +362,79 @@ func WriteToTraceDataCSV(filename string) {
 			elapsed, memBeforeMB, memAfterMB, memBeforeMB-memAfterMB))
 	}()
 
-	// 写入数据到CSV
-	for _, records := range dataToWrite {
-		appendToCSV(filename, records)
+	if splitByDay && traceDirCreated.Load() {
+		// 按天分组数据
+		dayData := make(map[int]map[string][]string) // 修改为使用map来保存每个记录，以实现去重
+
+		for _, records := range dataToWrite {
+			for _, record := range records {
+				if len(record) >= 2 { // 至少包含VehicleID和Time
+					timeStep, err := strconv.Atoi(record[1])
+					if err != nil {
+						continue // 跳过无效时间戳
+					}
+
+					// 根据时间戳确定天数
+					day := getDayFromTimeStep(timeStep)
+
+					// 确保该天的map已初始化
+					if _, exists := dayData[day]; !exists {
+						dayData[day] = make(map[string][]string)
+					}
+
+					// 使用vehicleID+time+posID作为唯一键
+					key := ""
+					if len(record) >= 3 {
+						key = record[0] + "_" + record[1] + "_" + record[2]
+					} else {
+						key = strings.Join(record, "_")
+					}
+
+					// 仅当该记录不存在时才添加
+					if _, exists := dayData[day][key]; !exists {
+						dayData[day][key] = record
+					}
+				}
+			}
+		}
+
+		// 为每天写入数据
+		for day, recordMap := range dayData {
+			if len(recordMap) > 0 {
+				// 将map转换为切片
+				records := make([][]string, 0, len(recordMap))
+				for _, record := range recordMap {
+					records = append(records, record)
+				}
+
+				dayFilename := filepath.Join(traceDirPath, fmt.Sprintf("day_%d.csv", day))
+				appendToCSV(dayFilename, records)
+				log.WriteLog(fmt.Sprintf("Wrote %d unique records to day %d trace file", len(records), day))
+			}
+		}
+	} else {
+		// 仅当不按天拆分时写入整体文件
+		// 添加去重逻辑
+		uniqueRecords := make(map[string][]string)
+
+		for _, records := range dataToWrite {
+			for _, record := range records {
+				if len(record) >= 3 {
+					key := record[0] + "_" + record[1] + "_" + record[2] // vehicleID+time+posID
+					uniqueRecords[key] = record
+				}
+			}
+		}
+
+		// 将唯一记录转换为切片
+		if len(uniqueRecords) > 0 {
+			recordsToWrite := make([][]string, 0, len(uniqueRecords))
+			for _, record := range uniqueRecords {
+				recordsToWrite = append(recordsToWrite, record)
+			}
+			appendToCSV(filename, recordsToWrite)
+			log.WriteLog(fmt.Sprintf("Wrote %d unique records to trace file", len(recordsToWrite)))
+		}
 	}
 
 	// 手动释放内存

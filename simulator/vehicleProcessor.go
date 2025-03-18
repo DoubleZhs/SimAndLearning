@@ -211,7 +211,7 @@ func updateVehicleActiveStatus(numWorkers int) {
 			// 获取配置的间隔，如果有效则使用它，否则使用默认值
 			var interval int
 			if cfg != nil {
-				interval = cfg.Trace.CheckpointInterval
+				interval = cfg.Trace.TraceRecordInterval
 			}
 			SetupVehicleTrace(vehicle, interval)
 		}

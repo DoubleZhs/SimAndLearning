@@ -19,8 +19,8 @@ func SetupVehicleTrace(vehicle *element.Vehicle, interval int) {
 
 	// 如果未指定间隔或间隔无效，使用配置的间隔
 	if interval <= 0 {
-		if cfg.Trace.CheckpointInterval > 0 {
-			interval = cfg.Trace.CheckpointInterval
+		if cfg.Trace.TraceRecordInterval > 0 {
+			interval = cfg.Trace.TraceRecordInterval
 		} else {
 			interval = 10 // 默认值，每10个时间步记录一次
 		}

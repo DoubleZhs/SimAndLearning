@@ -376,12 +376,16 @@ func (v *Vehicle) Move(time int) bool {
 			// 否则根据时间间隔决定是否记录
 			interval := v.traceInterval
 			if interval <= 0 {
-				// 使用默认间隔
+				// 根据配置更新轨迹记录间隔
 				cfg := config.GetConfig()
-				if cfg != nil && cfg.Trace.CheckpointInterval > 0 {
-					interval = cfg.Trace.CheckpointInterval
+				if cfg != nil && cfg.Trace.Enabled {
+					// 使用配置中的轨迹记录间隔
+					interval = cfg.Trace.TraceRecordInterval
+					v.traceInterval = interval // 更新车辆的轨迹记录间隔
 				} else {
-					interval = 10 // 默认间隔
+					// 默认值
+					interval = 10
+					v.traceInterval = interval
 				}
 			}
 
@@ -585,12 +589,16 @@ func (v *Vehicle) ShouldRecordTrace(time int) bool {
 	// 根据时间间隔决定是否记录
 	interval := v.traceInterval
 	if interval <= 0 {
-		// 使用默认间隔
+		// 根据配置更新轨迹记录间隔
 		cfg := config.GetConfig()
-		if cfg != nil && cfg.Trace.CheckpointInterval > 0 {
-			interval = cfg.Trace.CheckpointInterval
+		if cfg != nil && cfg.Trace.Enabled {
+			// 使用配置中的轨迹记录间隔
+			interval = cfg.Trace.TraceRecordInterval
+			v.traceInterval = interval // 更新车辆的轨迹记录间隔
 		} else {
-			interval = 10 // 默认间隔
+			// 默认值
+			interval = 10
+			v.traceInterval = interval
 		}
 	}
 

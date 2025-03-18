@@ -1,7 +1,7 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 3,
+        "simDay": 60,
         "numCell": 8000,
         "lightIndexInterval": 800
     },
@@ -22,22 +22,23 @@
         "initPhaseInterval": 40,
         "changes": [
             {
-                "day": 2,
+                "day": 21,
                 "multiplier": 2
             },
             {
-                "day": 3,
+                "day": 41,
                 "multiplier": 2
             }
         ]
     },
     "trace": {
         "enabled": true,
-        "checkpointInterval": 20,
+        "traceRecordInterval": 40,
         "writeInterval": 4800,
-        "maxCacheSize": 100000,
+        "maxCacheSize": 500000,
         "memoryThreshold": 50000,
         "enableMemoryMonitor": true,
-        "memoryCheckInterval": 1200
+        "memoryCheckInterval": 4800,
+        "splitByDay": true
     }
 } 

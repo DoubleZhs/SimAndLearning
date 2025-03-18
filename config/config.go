@@ -52,9 +52,9 @@ type TrafficLightConfig struct {
 type TraceConfig struct {
 	// 是否启用轨迹记录功能
 	Enabled bool `json:"enabled"`
-	// 检查点数量（每辆车记录的位置点数量）
-	// 如果不设置或设置为0，系统将根据路径长度自动确定合适的检查点数量
-	CheckpointInterval int `json:"checkpointInterval"`
+	// 轨迹记录间隔（车辆移动多少步记录一次位置）
+	// 如果不设置或设置为0，系统将根据路径长度自动确定合适的记录间隔
+	TraceRecordInterval int `json:"traceRecordInterval"`
 	// 轨迹数据写入间隔（时间步），独立于其他数据的写入间隔
 	WriteInterval int `json:"writeInterval"`
 	// 内存管理相关配置
@@ -66,6 +66,8 @@ type TraceConfig struct {
 	EnableMemoryMonitor bool `json:"enableMemoryMonitor"`
 	// 内存监控检查间隔(记录次数)
 	MemoryCheckInterval int `json:"memoryCheckInterval"`
+	// 是否按天拆分轨迹数据
+	SplitByDay bool `json:"splitByDay"`
 }
 
 var globalConfig *Config
@@ -83,8 +85,8 @@ func LoadConfig(filename string) error {
 	}
 
 	// 设置轨迹记录的默认值（如果未在配置文件中指定）
-	if config.Trace.CheckpointInterval <= 0 {
-		config.Trace.CheckpointInterval = 10 // 默认每辆车记录10个点
+	if config.Trace.TraceRecordInterval <= 0 {
+		config.Trace.TraceRecordInterval = 10 // 默认每辆车记录10个点
 	}
 
 	// 为新添加的配置项设置默认值
