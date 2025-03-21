@@ -1,9 +1,18 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 60,
-        "numCell": 8000,
-        "lightIndexInterval": 800
+        "simDay": 60
+    },
+    "graph": {
+        "graphType": "starRing",
+        "cycleGraph": {
+            "numCell": 8000,
+            "lightIndexInterval": 800
+        },
+        "starRingGraph": {
+            "ringCellsPerDirection": 200,
+            "starCellsPerDirection": 80
+        }
     },
     "logging": {
         "intervalWriteToLog": 1200,
@@ -40,5 +49,24 @@
         "enableMemoryMonitor": true,
         "memoryCheckInterval": 4800,
         "splitByDay": true
+    },
+    "path": {
+        "pathMethod": "kShortest",
+        "kShortest": {
+            "k": 3,
+            "selectionStrategy": "weighted",
+            "lengthWeightFactor": 2.0
+        }
+    },
+    "tripDistance": {
+        "enableDistanceLimit": false,
+        "probShortTrip": 0.51,
+        "probMediumTrip": 0.71,
+        "probLongTrip": 0.81,
+        "probVeryLong": 0.92,
+        "probExtreme": 0.95,
+        "probUltra": 0.99,
+        "minDistMultiplier": 1.0,
+        "maxDistMultiplier": 1.0
     }
 } 

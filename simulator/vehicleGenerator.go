@@ -66,6 +66,9 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node, traceN
 	// 使用互斥锁保护traceNodes
 	var traceNodesMutex sync.Mutex
 
+	// 获取配置的路径查找器
+	pathFinder := utils.GetPathFinder()
+
 	for i := 0; i < n; i++ {
 		go func() {
 			defer wg.Done()
@@ -73,17 +76,27 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node, traceN
 			// 从nodes中随机选择一个作为起点
 			oCell := nodes[rand.IntN(len(nodes))]
 
-			// 获取合适距离范围内的终点
-			minLength, maxLength := TripDistanceRange()
-			allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, maxLength)
+			// 根据是否启用距离限制选择不同的方式获取终点
+			var dCell graph.Node
+			if isDistanceLimitEnabled() {
+				// 获取合适距离范围内的终点
+				minLength, maxLength := TripDistanceRange()
+				allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, maxLength)
 
-			// 如果没有合适的终点，返回
-			if len(allowedDCells) == 0 {
-				return
+				// 如果没有合适的终点，返回
+				if len(allowedDCells) == 0 {
+					return
+				}
+
+				// 从可达节点中随机选择一个作为终点
+				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
+			} else {
+				// 如果不启用距离限制，直接随机选择目的地
+				dCell = GetRandomDestination(nodes, oCell)
+				if dCell == nil {
+					return
+				}
 			}
-
-			// 从可达节点中随机选择一个作为终点
-			dCell := allowedDCells[rand.IntN(len(allowedDCells))]
 
 			// 仅在启用轨迹记录时更新追踪节点列表
 			if traceEnabled {
@@ -109,8 +122,8 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node, traceN
 				return // 设置失败，跳过此车辆
 			}
 
-			// 计算最短路径
-			path, _, err := utils.ShortestPath(g, oCell, dCell)
+			// 计算路径（使用配置的路径查找方法）
+			path, _, err := pathFinder(g, oCell, dCell)
 			if err != nil {
 				return // 路径计算失败，跳过此车辆
 			}
@@ -165,6 +178,9 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 	// 使用互斥锁保护traceNodes
 	var traceNodesMutex sync.Mutex
 
+	// 获取配置的路径查找器
+	pathFinder := utils.GetPathFinder()
+
 	for i := 0; i < n; i++ {
 		go func() {
 			defer wg.Done()
@@ -172,17 +188,27 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 			// 从nodes中随机选择一个作为起点
 			oCell := nodes[rand.IntN(len(nodes))]
 
-			// 获取合适距离范围内的终点
-			minLength, maxLength := TripDistanceRange()
-			allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, maxLength)
+			// 根据是否启用距离限制选择不同的方式获取终点
+			var dCell graph.Node
+			if isDistanceLimitEnabled() {
+				// 获取合适距离范围内的终点
+				minLength, maxLength := TripDistanceRange()
+				allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, maxLength)
 
-			// 如果没有合适的终点，返回
-			if len(allowedDCells) == 0 {
-				return
+				// 如果没有合适的终点，返回
+				if len(allowedDCells) == 0 {
+					return
+				}
+
+				// 从可达节点中随机选择一个作为终点
+				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
+			} else {
+				// 如果不启用距离限制，直接随机选择目的地
+				dCell = GetRandomDestination(nodes, oCell)
+				if dCell == nil {
+					return
+				}
 			}
-
-			// 从可达节点中随机选择一个作为终点
-			dCell := allowedDCells[rand.IntN(len(allowedDCells))]
 
 			// 仅在启用轨迹记录时更新追踪节点列表
 			if traceEnabled {
@@ -208,8 +234,8 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 				return // 设置失败，跳过此车辆
 			}
 
-			// 计算最短路径
-			path, _, err := utils.ShortestPath(g, oCell, dCell)
+			// 计算路径（使用配置的路径查找方法）
+			path, _, err := pathFinder(g, oCell, dCell)
 			if err != nil {
 				return // 路径计算失败，跳过此车辆
 			}

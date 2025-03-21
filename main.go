@@ -202,6 +202,8 @@ func initializeResources(cfg *config.Config, initTime string) (*WorkerPool, stri
 	logFile := fmt.Sprintf("./log/%s_%d.log", initTime, cfg.Vehicle.NumClosedVehicle)
 	log.InitLog(logFile)
 	log.LogEnvironment()
+
+	// 记录模拟参数
 	log.LogSimParameters(
 		cfg.Simulation.OneDayTimeSteps,
 		cfg.Demand.Multiplier,
@@ -215,6 +217,17 @@ func initializeResources(cfg *config.Config, initTime string) (*WorkerPool, stri
 		cfg.TrafficLight.Changes[1].Day,
 		cfg.TrafficLight.Changes[1].Multiplier,
 	)
+
+	// 记录路网参数
+	log.WriteLog(fmt.Sprintf("路网类型: %s", cfg.Graph.GraphType))
+	if cfg.Graph.GraphType == "cycle" {
+		log.WriteLog(fmt.Sprintf("环形路网单元格数: %d", cfg.Graph.CycleGraph.NumCell))
+		log.WriteLog(fmt.Sprintf("环形路网红绿灯间隔: %d", cfg.Graph.CycleGraph.LightIndexInterval))
+	} else if cfg.Graph.GraphType == "starRing" {
+		log.WriteLog(fmt.Sprintf("星形环形路网环形连接单元格数: %d", cfg.Graph.StarRingGraph.RingCellsPerDirection))
+		log.WriteLog(fmt.Sprintf("星形环形路网星形连接单元格数: %d", cfg.Graph.StarRingGraph.StarCellsPerDirection))
+	}
+
 	log.WriteLog(fmt.Sprintf("Concurrent Volume in Vehicle Process: %d", numWorkers))
 
 	// 数据CSV初始化
@@ -237,43 +250,91 @@ func initializeResources(cfg *config.Config, initTime string) (*WorkerPool, stri
 
 // 初始化模拟环境
 func initializeSimulationEnvironment(cfg *config.Config) (*simple.DirectedGraph, []graph.Node, map[int64]*element.TrafficLightCell, []graph.Node, float64) {
-	// 仿真图初始化
-	g, nodesMap, lights := simulator.CreateCycleGraph(
-		cfg.Simulation.NumCell,
-		cfg.Simulation.LightIndexInterval,
-		cfg.TrafficLight.InitPhaseInterval,
-	)
-	numNodes := len(nodesMap)
-	log.WriteLog(fmt.Sprintf("Number of Nodes: %d", numNodes))
-	log.WriteLog(fmt.Sprintf("Number of TrafficLight Group: %d", len(lights)))
+	var g *simple.DirectedGraph
+	var nodesMap map[int64]graph.Node
+	var lights map[int64]*element.TrafficLightCell
 
-	// 预分配节点切片以减少内存分配
-	nodes := make([]graph.Node, len(nodesMap))
+	// 根据配置选择创建的路网类型
+	switch cfg.Graph.GraphType {
+	case "cycle":
+		// 创建环形路网
+		g, nodesMap, lights = simulator.CreateCycleGraph(
+			cfg.Graph.CycleGraph.NumCell,
+			cfg.Graph.CycleGraph.LightIndexInterval,
+			cfg.TrafficLight.InitPhaseInterval,
+		)
+	case "starRing":
+		// 创建星形环形混合路网
+		g, nodesMap, lights = simulator.CreateStarRingGraph(
+			cfg.Graph.StarRingGraph.RingCellsPerDirection,
+			cfg.Graph.StarRingGraph.StarCellsPerDirection,
+			cfg.TrafficLight.InitPhaseInterval,
+		)
+	default:
+		// 默认创建环形路网
+		log.WriteLog(fmt.Sprintf("未知的路网类型: %s，使用默认环形路网", cfg.Graph.GraphType))
+		g, nodesMap, lights = simulator.CreateCycleGraph(
+			cfg.Graph.CycleGraph.NumCell,
+			cfg.Graph.CycleGraph.LightIndexInterval,
+			cfg.TrafficLight.InitPhaseInterval,
+		)
+	}
+
+	numNodes := len(nodesMap)
+	log.WriteLog(fmt.Sprintf("路网类型: %s", cfg.Graph.GraphType))
+	log.WriteLog(fmt.Sprintf("节点总数: %d", numNodes))
+	log.WriteLog(fmt.Sprintf("红绿灯数量: %d", len(lights)))
+
+	// 将map转换为切片，便于后续处理
+	nodes := make([]graph.Node, 0, numNodes)
+	// 计算所有车道总数
 	var allLane float64
-	for i, node := range nodesMap {
-		nodes[i] = node
+	for _, node := range nodesMap {
+		nodes = append(nodes, node)
 		allLane += node.(element.Cell).Capacity()
 	}
+	// 计算平均车道数
 	avgLane := allLane / float64(numNodes)
-	log.WriteLog(fmt.Sprintf("Average lanes: %.2f", avgLane))
+	log.WriteLog(fmt.Sprintf("平均车道数: %.2f", avgLane))
 
+	// 检查图是否强连通
 	gConnect := utils.IsStronglyConnected(g)
-	log.WriteLog(fmt.Sprintf("Graph Connected: %v", gConnect))
+	log.WriteLog(fmt.Sprintf("图连通性: %v", gConnect))
 
-	// 跟踪节点初始化 - 选择更多的节点进行轨迹记录
-	// 每隔固定节点数选择一个作为跟踪节点
-	trackNodeInterval := 20 // 固定值，不再从配置中读取
-	log.WriteLog(fmt.Sprintf("Track node interval: %d", trackNodeInterval))
-
-	traceNodes := make([]graph.Node, 0, len(nodes)/trackNodeInterval+1)
-
-	for i, node := range nodes {
-		if i%trackNodeInterval == 0 {
-			traceNodes = append(traceNodes, node)
+	// 对于starRing图，使用更详细的连通性检查
+	if cfg.Graph.GraphType == "starRing" && !gConnect {
+		isConnected, problems := simulator.VerifyStarRingGraphConnectivity(g)
+		log.WriteLog(fmt.Sprintf("starRing图连通性详细检查: %v", isConnected))
+		if !isConnected && len(problems) > 0 {
+			log.WriteLog("连通性问题详情:")
+			for _, problem := range problems {
+				log.WriteLog(fmt.Sprintf("- %s", problem))
+			}
 		}
 	}
 
-	log.WriteLog(fmt.Sprintf("Total trace nodes: %d", len(traceNodes)))
+	// 创建跟踪节点切片（用于记录轨迹数据）
+	var traceNodes []graph.Node
+	if cfg.Trace.Enabled {
+		// 根据配置决定跟踪节点的采样方式
+		if cfg.Trace.TraceRecordInterval > 1 {
+			// 每隔固定节点数选择一个作为跟踪节点
+			traceNodes = make([]graph.Node, 0, len(nodes)/cfg.Trace.TraceRecordInterval+1)
+			for i, node := range nodes {
+				if i%cfg.Trace.TraceRecordInterval == 0 {
+					traceNodes = append(traceNodes, node)
+				}
+			}
+			log.WriteLog(fmt.Sprintf("轨迹记录已启用，采样间隔: %d, 跟踪节点数: %d", cfg.Trace.TraceRecordInterval, len(traceNodes)))
+		} else {
+			// 使用所有节点
+			traceNodes = nodes
+			log.WriteLog("轨迹记录已启用，跟踪所有节点")
+		}
+	} else {
+		traceNodes = nil
+		log.WriteLog("轨迹记录已禁用")
+	}
 
 	return g, nodes, lights, traceNodes, avgLane
 }

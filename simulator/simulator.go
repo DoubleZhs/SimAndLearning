@@ -49,20 +49,6 @@ func GetVehiclesOnRoad(nodes []graph.Node) map[*element.Vehicle]struct{} {
 	return vehiclesOnRoad
 }
 
-// func GetVehiclesOnRoad() map[*element.Vehicle]struct{} {
-// 	activeVehiclesMutex.Lock()
-// 	defer activeVehiclesMutex.Unlock()
-
-// 	vehiclesOnRaod := make(map[*element.Vehicle]struct{})
-// 	for vehicle := range activeVehicles {
-// 		if vehicle.State() == 4 {
-// 			vehiclesOnRaod[vehicle] = struct{}{}
-// 		}
-// 	}
-
-// 	return vehiclesOnRaod
-// }
-
 func GetAverageSpeed_Density(vehiclesOnRoad map[*element.Vehicle]struct{}, numNodes int, avgLane float64) (float64, float64) {
 	if len(vehiclesOnRoad) == 0 {
 		return 0.0, 0.0

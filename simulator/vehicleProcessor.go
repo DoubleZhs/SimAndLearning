@@ -38,6 +38,9 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 	}
 	completedVehiclesMutex.RUnlock()
 
+	// 获取配置的路径查找器
+	pathFinder := utils.GetPathFinder()
+
 	for _, vehicle := range vehiclesToProcess {
 		// 记录车辆数据
 		recorder.RecordVehicleData(vehicle)
@@ -50,15 +53,28 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 
 			// 为车辆选择新的起点和终点
 			newO := vehicle.Destination()
-			minLength, maxLength := TripDistanceRange()
 
-			// 获取可达节点
-			allowedDCells := utils.AccessibleNodesWithinRange(g, newO, minLength, maxLength)
-			if len(allowedDCells) == 0 {
-				continue // 如果没有可达节点，跳过此车辆
+			// 根据是否启用距离限制选择不同的方式获取终点
+			var newD graph.Node
+			if isDistanceLimitEnabled() {
+				minLength, maxLength := TripDistanceRange()
+
+				// 获取可达节点
+				allowedDCells := utils.AccessibleNodesWithinRange(g, newO, minLength, maxLength)
+				if len(allowedDCells) == 0 {
+					continue // 如果没有可达节点，跳过此车辆
+				}
+
+				newD = allowedDCells[rand.IntN(len(allowedDCells))]
+			} else {
+				// 如果不启用距离限制，直接随机选择目的地
+				// 获取图中所有节点
+				nodes := graph.NodesOf(g.Nodes())
+				newD = GetRandomDestination(nodes, newO)
+				if newD == nil {
+					continue
+				}
 			}
-
-			newD := allowedDCells[rand.IntN(len(allowedDCells))]
 
 			// 更新追踪节点列表
 			var findO, findD bool
@@ -100,8 +116,8 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 				}
 			}
 
-			// 设置路径
-			path, _, err := utils.ShortestPath(g, newO, newD)
+			// 设置路径（使用配置的路径查找方法）
+			path, _, err := pathFinder(g, newO, newD)
 			if err != nil {
 				continue // 如果无法找到路径，跳过此车辆
 			}
