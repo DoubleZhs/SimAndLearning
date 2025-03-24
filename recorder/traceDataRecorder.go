@@ -157,6 +157,50 @@ func RecordTraceData(vehicle *element.Vehicle) {
 	if enableMemMonitor && count%int32(memoryCheckInterval) == 0 {
 		go checkMemoryUsage()
 	}
+
+	// 检查是否需要定期写入文件 (每100,000条记录写入一次)
+	if count > 0 && count%100000 == 0 {
+		// 获取当前文件名
+		cfg := config.GetConfig()
+		if cfg != nil && len(traceDataCache) > 0 {
+			// 获取合适的文件名
+			var filename string
+			if splitByDay {
+				if traceDirCreated.Load() && traceDirPath != "" {
+					// 因为这是定期写入，我们只写入当天的数据
+					// 获取当前时间
+					currentDay := getDayFromTimeStep(int(count)) // 使用记录计数作为时间近似值
+					filename = filepath.Join(traceDirPath, fmt.Sprintf("day_%d.csv", currentDay))
+				}
+			} else {
+				// 查找最近的trace文件
+				files, err := filepath.Glob("./data/*_TraceData.csv")
+				if err == nil && len(files) > 0 {
+					filename = files[0]
+					for _, f := range files {
+						if fileInfo1, err1 := os.Stat(f); err1 == nil {
+							if fileInfo2, err2 := os.Stat(filename); err2 == nil {
+								if fileInfo1.ModTime().After(fileInfo2.ModTime()) {
+									filename = f
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if filename != "" {
+				// 触发异步写入，避免阻塞主流程
+				go func(fname string) {
+					// 仅当未写入状态时触发写入操作
+					if atomic.CompareAndSwapInt32(&isWriting, 0, 1) {
+						WriteToTraceDataCSV(fname)
+						atomic.StoreInt32(&isWriting, 0)
+					}
+				}(filename)
+			}
+		}
+	}
 }
 
 // checkMemoryUsage 检查内存使用情况，如果超过阈值，触发写入
@@ -469,7 +513,7 @@ func SaveTraceData(data [][]string) {
 	}
 
 	// 验证数据格式，确保兼容性
-	if len(data[0]) > 3 {
+	if len(data) > 0 && len(data[0]) > 3 {
 		// 如果数据包含超过3个字段，进行转换以适应新格式
 		log.WriteLog("Warning: Converting legacy trace data format to new format")
 		convertedData := make([][]string, 0, len(data))
@@ -489,9 +533,8 @@ func SaveTraceData(data [][]string) {
 	traceDataMutex.Lock()
 	defer traceDataMutex.Unlock()
 
-	// 将数据包装成轨迹格式并添加到缓存
-	wrapper := [][]string(data)
-	traceDataCache = append(traceDataCache, wrapper)
+	// 将数据添加到缓存
+	traceDataCache = append(traceDataCache, data)
 
 	// 增加记录计数
 	atomic.AddInt32(&recordCount, 1)

@@ -4,14 +4,14 @@
         "simDay": 60
     },
     "graph": {
-        "graphType": "starRing",
+        "graphType": "cycle",
         "cycleGraph": {
             "numCell": 8000,
             "lightIndexInterval": 800
         },
         "starRingGraph": {
-            "ringCellsPerDirection": 200,
-            "starCellsPerDirection": 80
+            "ringCellsPerDirection": 500,
+            "starCellsPerDirection": 250
         }
     },
     "logging": {
@@ -51,15 +51,15 @@
         "splitByDay": true
     },
     "path": {
-        "pathMethod": "kShortest",
+        "pathMethod": "shortest",
         "kShortest": {
             "k": 3,
             "selectionStrategy": "weighted",
-            "lengthWeightFactor": 2.0
+            "lengthWeightFactor": 0.5
         }
     },
     "tripDistance": {
-        "enableDistanceLimit": false,
+        "enableDistanceLimit": true,
         "probShortTrip": 0.51,
         "probMediumTrip": 0.71,
         "probLongTrip": 0.81,

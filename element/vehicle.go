@@ -335,6 +335,12 @@ func (v *Vehicle) Move(time int) bool {
 		v.randomSlowing()
 
 		if v.velocity == 0 {
+			// 即使速度为0，也应考虑记录当前位置
+			shouldRecord := (time - v.lastTraceTime) >= v.traceInterval
+			if shouldRecord && v.pos != nil {
+				v.trace[v.pos.ID()] = time
+				v.lastTraceTime = time
+			}
 			return false
 		}
 
@@ -370,7 +376,7 @@ func (v *Vehicle) Move(time int) bool {
 		shouldRecord := false
 
 		// 如果是终点，必须记录
-		if len(v.residualPath) == 0 && v.pos.ID() == v.destination.ID() {
+		if len(v.residualPath) == v.velocity && v.pos.ID() == v.destination.ID() {
 			shouldRecord = true
 		} else {
 			// 否则根据时间间隔决定是否记录

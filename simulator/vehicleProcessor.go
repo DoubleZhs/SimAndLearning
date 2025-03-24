@@ -44,13 +44,12 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 	for _, vehicle := range vehiclesToProcess {
 		// 记录车辆数据
 		recorder.RecordVehicleData(vehicle)
-		// 记录轨迹数据 - 确保终点轨迹被记录
-		RecordVehicleEndTrace(vehicle, simTime)
+
+		// 终点已在Vehicle.Move方法中被记录，不需要再次调用RecordVehicleEndTrace
+		// 删除: RecordVehicleEndTrace(vehicle, simTime)
 
 		// 仅处理闭环车辆（需要重新进入系统的车辆）
 		if vehicle.Flag() {
-			id, velocity, acceleration, slowingProb := vehicle.Index(), vehicle.Velocity(), vehicle.Acceleration(), vehicle.SlowingProb()
-
 			// 为车辆选择新的起点和终点
 			newO := vehicle.Destination()
 
@@ -104,8 +103,15 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 				}
 			}
 
-			// 创建新车辆并设置起终点
-			newVehicle := element.NewVehicle(id, velocity, acceleration, 1.0, slowingProb, true)
+			// 创建全新的闭环车辆，生成随机属性，不再保留原车辆的属性
+			newVehicle := element.NewVehicle(
+				getNextVehicleID(),         // 获取新的车辆ID
+				randomVelocity(),           // 随机初始速度
+				randomAcceleration(),       // 随机加速度
+				1.0,                        // 车辆长度
+				randomSlowingProbability(), // 随机减速概率
+				true,                       // 保持为闭环车辆(flag=true)
+			)
 			// 确保轨迹数据为空
 			newVehicle.ClearTrace()
 
@@ -144,6 +150,11 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 			waitingVehicles[newVehicle] = struct{}{}
 			waitingVehiclesMutex.Unlock()
 			atomic.AddInt64(&numVehiclesWaiting, 1)
+
+			// 强制立即调用一次RecordVehicleTrace，确保初始位置被记录
+			if traceEnabled {
+				RecordVehicleTrace(newVehicle, simTime)
+			}
 		}
 
 		// 从完成列表中移除车辆
@@ -274,13 +285,19 @@ func updateVehiclePosition(numWorkers, simTime int) {
 		go func() {
 			for vehicle := range vehicleChan {
 				// 移动车辆
-				if completed := vehicle.Move(simTime); completed {
-					// 如果车辆到达终点，将其加入完成通道
-					completedVehicleChan <- vehicle
-				} else if traceEnabled {
-					// 记录轨迹（只在车辆移动后但未完成时记录）
+				completed := vehicle.Move(simTime)
+
+				// 只有当车辆未完成行程时才在这里记录轨迹
+				// 完成行程的车辆轨迹会在Move方法内部记录终点
+				if traceEnabled && !completed {
 					RecordVehicleTrace(vehicle, simTime)
 				}
+
+				// 如果车辆到达终点，将其加入完成通道
+				if completed {
+					completedVehicleChan <- vehicle
+				}
+
 				wg.Done()
 			}
 		}()
@@ -314,6 +331,6 @@ func updateVehiclePosition(numWorkers, simTime int) {
 		completedVehiclesMutex.Unlock()
 		atomic.AddInt64(&numVehicleCompleted, 1)
 
-		// 轨迹记录已在Move方法中完成，无需再次处理
+		// 由于已在前面记录了轨迹，这里不需要再处理
 	}
 }

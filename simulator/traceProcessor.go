@@ -43,6 +43,9 @@ func SetupVehicleTrace(vehicle *element.Vehicle, interval int) {
 			} else { // state = 4
 				vehicle.AddTracePoint(vehicle.CurrentPosition().ID(), vehicle.InTime())
 			}
+
+			// 立即记录这个初始轨迹点到数据库
+			recorder.RecordTraceData(vehicle)
 		}
 	}
 }
@@ -62,8 +65,8 @@ func RecordVehicleTrace(vehicle *element.Vehicle, currentTime int) {
 
 	// 只有当车辆已进入系统(state≥3)时才记录轨迹
 	vehicleState := vehicle.State()
-	if vehicleState < 3 || vehicleState > 4 {
-		return // 只记录state=3(缓冲区)和state=4(路网中)的车辆
+	if vehicleState < 3 || vehicleState > 5 { // 包含state=5（完成状态）
+		return // 只记录state=3(缓冲区)、state=4(路网中)和state=5(完成)的车辆
 	}
 
 	// 判断是否应该记录轨迹
@@ -73,8 +76,8 @@ func RecordVehicleTrace(vehicle *element.Vehicle, currentTime int) {
 		if vehicleState == 3 {
 			// 如果车辆在缓冲区，记录起点
 			positionNode = vehicle.Origin()
-		} else { // state = 4
-			// 如果车辆在路网中，记录当前位置
+		} else { // state = 4 或 5
+			// 如果车辆在路网中或已完成，记录当前位置
 			positionNode = vehicle.CurrentPosition()
 		}
 
@@ -90,7 +93,9 @@ func RecordVehicleTrace(vehicle *element.Vehicle, currentTime int) {
 	}
 }
 
-// 当车辆完成旅程时，记录终点轨迹
+// 当车辆完成行程时，记录终点轨迹
+// 此函数仅用于特殊情况，如记录完成但未到达终点的车辆轨迹
+// 一般情况下，终点位置已在Vehicle.Move方法中被记录
 func RecordVehicleEndTrace(vehicle *element.Vehicle, currentTime int) {
 	// 检查是否启用轨迹记录
 	cfg := config.GetConfig()
@@ -102,8 +107,24 @@ func RecordVehicleEndTrace(vehicle *element.Vehicle, currentTime int) {
 		return
 	}
 
-	// 记录目的地作为最后一个轨迹点
-	if destination := vehicle.Destination(); destination != nil {
+	// 检查车辆当前状态，确认必要性
+	vehicleState := vehicle.State()
+	if vehicleState != 5 {
+		// 只处理已完成状态的车辆
+		return
+	}
+
+	// 检查车辆当前位置是否已经是终点
+	currentPos := vehicle.CurrentPosition()
+	destination := vehicle.Destination()
+
+	if currentPos != nil && destination != nil && currentPos.ID() == destination.ID() {
+		// 车辆已经在终点位置，无需重复记录
+		return
+	}
+
+	// 只有当车辆不在终点位置时，才记录终点
+	if destination != nil {
 		vehicle.AddTracePoint(destination.ID(), currentTime)
 		recorder.RecordTraceData(vehicle)
 	}
