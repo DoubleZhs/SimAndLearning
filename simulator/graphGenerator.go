@@ -3,8 +3,8 @@ package simulator
 import (
 	"encoding/json"
 	"fmt"
-	"graphCA/element"
-	"graphCA/utils"
+	"simAndLearning/element"
+	"simAndLearning/utils"
 	"math"
 	"os"
 	"path/filepath"

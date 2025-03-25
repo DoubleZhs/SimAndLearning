@@ -1,7 +1,7 @@
 package simulator
 
 import (
-	"graphCA/config"
+	"simAndLearning/config"
 	"math"
 
 	"math/rand/v2"
@@ -18,12 +18,12 @@ const (
 	CELL_LENGTH float64 = 7.5
 
 	// 距离范围概率分布分界点（默认值）
-	DEFAULT_PROB_SHORT_TRIP  float64 = 0.51 // 短途旅行概率(<=3.85英里)
-	DEFAULT_PROB_MEDIUM_TRIP float64 = 0.71 // 中途旅行概率(<=7.65英里)
-	DEFAULT_PROB_LONG_TRIP   float64 = 0.81 // 长途旅行概率(<=11.59英里)
-	DEFAULT_PROB_VERY_LONG   float64 = 0.92 // 很长旅行概率(<=19.68英里)
-	DEFAULT_PROB_EXTREME     float64 = 0.95 // 极长旅行概率(<=30英里)
-	DEFAULT_PROB_ULTRA       float64 = 0.99 // 超长旅行概率(<=70英里)
+	// 注：所有概率都放缩到DIST_EXTREME以内
+	DEFAULT_PROB_SHORT_TRIP  float64 = 0.54 // 短途旅行概率(<=3.85英里)，原0.51放缩
+	DEFAULT_PROB_MEDIUM_TRIP float64 = 0.75 // 中途旅行概率(<=7.65英里)，原0.71放缩
+	DEFAULT_PROB_LONG_TRIP   float64 = 0.85 // 长途旅行概率(<=11.59英里)，原0.81放缩
+	DEFAULT_PROB_VERY_LONG   float64 = 0.97 // 很长旅行概率(<=19.68英里)，原0.92放缩
+	DEFAULT_PROB_EXTREME     float64 = 1.00 // 极长旅行概率(<=30英里)，原0.95放缩为1.0
 
 	// 各个距离级别的上限(英里)
 	DIST_VERY_SHORT float64 = 1.00
@@ -32,18 +32,20 @@ const (
 	DIST_LONG       float64 = 11.59
 	DIST_VERY_LONG  float64 = 19.68
 	DIST_EXTREME    float64 = 30.00
-	DIST_ULTRA      float64 = 70.00
-	DIST_MAXIMUM    float64 = 100.00
+	// 不再使用ULTRA和MAXIMUM
+	// DIST_ULTRA      float64 = 70.00
+	// DIST_MAXIMUM    float64 = 100.00
 )
 
 // 获取距离概率分布阈值，优先使用配置文件中的值，如果未配置则使用默认值
-func getProbabilities() (float64, float64, float64, float64, float64, float64) {
+// 所有概率都放缩到EXTREME以内
+func getProbabilities() (float64, float64, float64, float64, float64) {
 	cfg := config.GetConfig()
 	// 如果配置为nil或未设置相关配置，则使用默认值
 	if cfg == nil {
 		return DEFAULT_PROB_SHORT_TRIP, DEFAULT_PROB_MEDIUM_TRIP,
 			DEFAULT_PROB_LONG_TRIP, DEFAULT_PROB_VERY_LONG,
-			DEFAULT_PROB_EXTREME, DEFAULT_PROB_ULTRA
+			DEFAULT_PROB_EXTREME
 	}
 
 	// 检查是否有自定义概率分布，如果所有值都为0则使用默认值
@@ -51,17 +53,32 @@ func getProbabilities() (float64, float64, float64, float64, float64, float64) {
 		cfg.TripDistance.ProbMediumTrip == 0 &&
 		cfg.TripDistance.ProbLongTrip == 0 &&
 		cfg.TripDistance.ProbVeryLong == 0 &&
-		cfg.TripDistance.ProbExtreme == 0 &&
-		cfg.TripDistance.ProbUltra == 0 {
+		cfg.TripDistance.ProbExtreme == 0 {
 		return DEFAULT_PROB_SHORT_TRIP, DEFAULT_PROB_MEDIUM_TRIP,
 			DEFAULT_PROB_LONG_TRIP, DEFAULT_PROB_VERY_LONG,
-			DEFAULT_PROB_EXTREME, DEFAULT_PROB_ULTRA
+			DEFAULT_PROB_EXTREME
 	}
 
-	// 使用配置文件中的值
-	return cfg.TripDistance.ProbShortTrip, cfg.TripDistance.ProbMediumTrip,
-		cfg.TripDistance.ProbLongTrip, cfg.TripDistance.ProbVeryLong,
-		cfg.TripDistance.ProbExtreme, cfg.TripDistance.ProbUltra
+	// 使用配置文件中的值并放缩到EXTREME以内
+	// 如果配置的极限概率不是1，则进行放缩
+	probExtreme := cfg.TripDistance.ProbExtreme
+	if probExtreme < 1.0 && probExtreme > 0 {
+		// 放缩因子
+		scaleFactor := 1.0 / probExtreme
+
+		return math.Min(cfg.TripDistance.ProbShortTrip*scaleFactor, 1.0),
+			math.Min(cfg.TripDistance.ProbMediumTrip*scaleFactor, 1.0),
+			math.Min(cfg.TripDistance.ProbLongTrip*scaleFactor, 1.0),
+			math.Min(cfg.TripDistance.ProbVeryLong*scaleFactor, 1.0),
+			1.0 // EXTREME总是为1.0
+	}
+
+	// 如果probExtreme已经是1或无效值，则直接使用原值，但确保EXTREME为1
+	return cfg.TripDistance.ProbShortTrip,
+		cfg.TripDistance.ProbMediumTrip,
+		cfg.TripDistance.ProbLongTrip,
+		cfg.TripDistance.ProbVeryLong,
+		1.0 // EXTREME总是为1.0
 }
 
 // 获取距离倍数，优先使用配置文件中的值，如果未配置则使用默认值1.0
@@ -98,10 +115,10 @@ func isDistanceLimitEnabled() bool {
 
 // TripDistanceLim 根据概率分布随机生成一个行程距离上限
 // 返回换算成单元格数量的距离上限
-// 注意：目前只使用了较短距离的概率分布
+// 已更新为只使用EXTREME以内的距离
 func TripDistanceLim() int {
 	// 获取配置的概率分布
-	probShort, probMedium, probLong, probVeryLong, probExtreme, probUltra := getProbabilities()
+	probShort, probMedium, probLong, probVeryLong, _ := getProbabilities()
 	_, maxMult := getDistanceMultipliers()
 
 	dice := rand.Float64()
@@ -116,12 +133,8 @@ func TripDistanceLim() int {
 		lim = DIST_LONG
 	case dice <= probVeryLong:
 		lim = DIST_VERY_LONG
-	case dice <= probExtreme:
-		lim = DIST_EXTREME
-	case dice <= probUltra:
-		lim = DIST_ULTRA
 	default:
-		lim = DIST_MAXIMUM
+		lim = DIST_EXTREME
 	}
 
 	// 应用最大距离倍数
@@ -133,7 +146,7 @@ func TripDistanceLim() int {
 
 // TripDistanceRange 生成一个行程距离范围
 // 返回换算成单元格数量的最小和最大距离
-// 注意：目前实现中只使用了前几个概率区间
+// 已更新为只使用EXTREME以内的距离
 func TripDistanceRange() (int, int) {
 	// 检查是否启用距离限制
 	if !isDistanceLimitEnabled() {
@@ -142,23 +155,20 @@ func TripDistanceRange() (int, int) {
 	}
 
 	// 获取配置的概率分布
-	probShort, probMedium, probLong, probVeryLong, probExtreme, _ := getProbabilities()
+	probShort, probMedium, probLong, probVeryLong, _ := getProbabilities()
 	minMult, maxMult := getDistanceMultipliers()
 
 	dice := rand.Float64()
 
-	// 归一化 - 只考虑probExtreme以内的概率
-	normalizedDice := dice / probExtreme
-
 	var minDis, maxDis float64
 	switch {
-	case normalizedDice <= probShort/probExtreme:
+	case dice <= probShort:
 		minDis, maxDis = DIST_VERY_SHORT, DIST_SHORT
-	case normalizedDice <= probMedium/probExtreme:
+	case dice <= probMedium:
 		minDis, maxDis = DIST_SHORT, DIST_MEDIUM
-	case normalizedDice <= probLong/probExtreme:
+	case dice <= probLong:
 		minDis, maxDis = DIST_MEDIUM, DIST_LONG
-	case normalizedDice <= probVeryLong/probExtreme:
+	case dice <= probVeryLong:
 		minDis, maxDis = DIST_LONG, DIST_VERY_LONG
 	default:
 		minDis, maxDis = DIST_VERY_LONG, DIST_EXTREME

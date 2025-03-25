@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"graphCA/element"
+	"simAndLearning/element"
 	"sync"
 
 	"gonum.org/v1/gonum/graph"

@@ -1,7 +1,7 @@
 package simulator
 
 import (
-	"graphCA/element"
+	"simAndLearning/element"
 	"sync"
 	"sync/atomic"
 

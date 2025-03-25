@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"graphCA/config"
+	"simAndLearning/config"
 	"math"
 	"math/rand/v2"
 

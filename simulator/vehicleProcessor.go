@@ -1,10 +1,9 @@
 package simulator
 
 import (
-	"graphCA/config"
-	"graphCA/element"
-	"graphCA/recorder"
-	"graphCA/utils"
+	"simAndLearning/element"
+	"simAndLearning/recorder"
+	"simAndLearning/utils"
 	"sync"
 	"sync/atomic"
 
@@ -16,16 +15,15 @@ import (
 
 // VehicleProcess 处理当前模拟环境中所有车辆的状态
 // 依次执行：检查已完成车辆、更新车辆激活状态、更新车辆位置、处理检查点
-// traceNodes参数用于记录车辆OD点
-func VehicleProcess(numWorkers, simTime int, g *simple.DirectedGraph, traceNodes []graph.Node) {
-	checkCompletedVehicle(simTime, g, traceNodes)
+func VehicleProcess(numWorkers, simTime int, g *simple.DirectedGraph) {
+	checkCompletedVehicle(simTime, g)
 	updateVehicleActiveStatus(numWorkers)
 	updateVehiclePosition(numWorkers, simTime)
 }
 
 // checkCompletedVehicle 处理已完成行程的车辆
 // 记录数据并根据车辆类型决定是否重新进入系统
-func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []graph.Node) {
+func checkCompletedVehicle(simTime int, g *simple.DirectedGraph) {
 	if len(completedVehicles) == 0 {
 		return
 	}
@@ -45,9 +43,6 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 	for _, vehicle := range vehiclesToProcess {
 		// 记录车辆数据
 		recorder.RecordVehicleData(vehicle)
-
-		// 终点已在Vehicle.Move方法中被记录，不需要再次调用RecordVehicleEndTrace
-		// 删除: RecordVehicleEndTrace(vehicle, simTime)
 
 		// 仅处理闭环车辆（需要重新进入系统的车辆）
 		if vehicle.Flag() {
@@ -76,34 +71,6 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 				}
 			}
 
-			// 更新OD点记录
-			var findO, findD bool
-			for _, node := range traceNodes {
-				if node.ID() == newO.ID() {
-					findO = true
-				}
-				if node.ID() == newD.ID() {
-					findD = true
-				}
-			}
-
-			if !findO {
-				traceNodes = append(traceNodes, newO)
-			}
-			if !findD {
-				traceNodes = append(traceNodes, newD)
-			}
-
-			// 处理之前行程的轨迹数据
-			trace := vehicle.Trace()
-			if len(trace) > 0 {
-				// 格式化之前行程的轨迹数据并保存
-				oldRecordData := recorder.FormatTraceForNewJourney(vehicle)
-				if len(oldRecordData) > 0 {
-					recorder.SaveTraceData(oldRecordData)
-				}
-			}
-
 			// 创建全新的闭环车辆，生成随机属性，不再保留原车辆的属性
 			newVehicle := element.NewVehicle(
 				getNextVehicleID(),         // 获取新的车辆ID
@@ -113,8 +80,6 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 				randomSlowingProbability(), // 随机减速概率
 				true,                       // 保持为闭环车辆(flag=true)
 			)
-			// 确保轨迹数据为空
-			newVehicle.ClearTrace()
 
 			if ok, err := newVehicle.SetOD(g, newO, newD); !ok {
 				if err != nil {
@@ -138,24 +103,11 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 			// 将车辆放入缓冲区
 			newVehicle.BufferIn(simTime)
 
-			// 设置车辆轨迹记录
-			// 检查是否启用轨迹记录
-			cfg := config.GetConfig()
-			traceEnabled := cfg != nil && cfg.Trace.Enabled
-			if traceEnabled {
-				SetupVehicleTrace(newVehicle, 0) // 使用默认间隔
-			}
-
 			// 添加到等待队列
 			waitingVehiclesMutex.Lock()
 			waitingVehicles[newVehicle] = struct{}{}
 			waitingVehiclesMutex.Unlock()
 			atomic.AddInt64(&numVehiclesWaiting, 1)
-
-			// 强制立即调用一次RecordVehicleTrace，确保初始位置被记录
-			if traceEnabled {
-				RecordVehicleTrace(newVehicle, simTime)
-			}
 		}
 
 		// 从完成列表中移除车辆
@@ -217,10 +169,6 @@ func updateVehicleActiveStatus(numWorkers int) {
 	close(vehicleChan)
 	wg.Wait()
 
-	// 检查是否启用轨迹记录
-	cfg := config.GetConfig()
-	traceEnabled := cfg != nil && cfg.Trace.Enabled
-
 	// 处理激活的车辆
 	for vehicle := range recordActivatedVehicle {
 		// 从等待列表移到活动列表
@@ -233,16 +181,6 @@ func updateVehicleActiveStatus(numWorkers int) {
 		activeVehicles[vehicle] = struct{}{}
 		activeVehiclesMutex.Unlock()
 		atomic.AddInt64(&numVehiclesActive, 1)
-
-		// 仅在启用轨迹记录时设置轨迹记录
-		if traceEnabled {
-			// 获取配置的间隔，如果有效则使用它，否则使用默认值
-			var interval int
-			if cfg != nil {
-				interval = cfg.Trace.TraceRecordInterval
-			}
-			SetupVehicleTrace(vehicle, interval)
-		}
 	}
 }
 
@@ -277,22 +215,12 @@ func updateVehiclePosition(numWorkers, simTime int) {
 	// 创建工作通道
 	vehicleChan := make(chan *element.Vehicle, numWorkers)
 
-	// 检查是否启用轨迹记录
-	cfg := config.GetConfig()
-	traceEnabled := cfg != nil && cfg.Trace.Enabled
-
 	// 启动工作协程
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for vehicle := range vehicleChan {
 				// 移动车辆
 				completed := vehicle.Move(simTime)
-
-				// 只有当车辆未完成行程时才在这里记录轨迹
-				// 完成行程的车辆轨迹会在Move方法内部记录终点
-				if traceEnabled && !completed {
-					RecordVehicleTrace(vehicle, simTime)
-				}
 
 				// 如果车辆到达终点，将其加入完成通道
 				if completed {
@@ -331,7 +259,5 @@ func updateVehiclePosition(numWorkers, simTime int) {
 		completedVehicles[vehicle] = struct{}{}
 		completedVehiclesMutex.Unlock()
 		atomic.AddInt64(&numVehicleCompleted, 1)
-
-		// 由于已在前面记录了轨迹，这里不需要再处理
 	}
 }

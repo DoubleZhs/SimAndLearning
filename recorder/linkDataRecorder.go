@@ -2,7 +2,7 @@ package recorder
 
 import (
 	"fmt"
-	"graphCA/element"
+	"simAndLearning/element"
 	"strconv"
 	"sync"
 )

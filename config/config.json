@@ -1,7 +1,7 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 1
+        "simDay": 3
     },
     "graph": {
         "graphType": "cycle",
@@ -10,8 +10,8 @@
             "lightIndexInterval": 800
         },
         "starRingGraph": {
-            "ringCellsPerDirection": 500,
-            "starCellsPerDirection": 250
+            "ringCellsPerDirection": 600,
+            "starCellsPerDirection": 400
         }
     },
     "logging": {
@@ -19,7 +19,7 @@
         "intervalWriteOtherData": 14400
     },
     "demand": {
-        "multiplier": 40000,
+        "multiplier": 45000,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
@@ -31,41 +31,30 @@
         "initPhaseInterval": 40,
         "changes": [
             {
-                "day": 21,
+                "day": 2,
                 "multiplier": 2
             },
             {
-                "day": 41,
+                "day": 3,
                 "multiplier": 2
             }
         ]
-    },
-    "trace": {
-        "enabled": true,
-        "traceRecordInterval": 40,
-        "writeInterval": 4800,
-        "maxCacheSize": 500000,
-        "memoryThreshold": 50000,
-        "enableMemoryMonitor": true,
-        "memoryCheckInterval": 4800,
-        "splitByDay": true
     },
     "path": {
         "pathMethod": "shortest",
         "kShortest": {
             "k": 3,
             "selectionStrategy": "weighted",
-            "lengthWeightFactor": 0.5
+            "lengthWeightFactor": 0.35
         }
     },
     "tripDistance": {
         "enableDistanceLimit": true,
-        "probShortTrip": 0.51,
-        "probMediumTrip": 0.71,
-        "probLongTrip": 0.81,
-        "probVeryLong": 0.92,
-        "probExtreme": 0.95,
-        "probUltra": 0.99,
+        "probShortTrip": 0.54,
+        "probMediumTrip": 0.75,
+        "probLongTrip": 0.85,
+        "probVeryLong": 0.97,
+        "probExtreme": 1.0,
         "minDistMultiplier": 1.0,
         "maxDistMultiplier": 1.0
     }

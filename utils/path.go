@@ -2,7 +2,7 @@ package utils
 
 import (
 	"errors"
-	"graphCA/element"
+	"simAndLearning/element"
 
 	"math/rand/v2"
 
