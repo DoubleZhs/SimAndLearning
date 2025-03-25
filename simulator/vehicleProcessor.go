@@ -16,6 +16,7 @@ import (
 
 // VehicleProcess 处理当前模拟环境中所有车辆的状态
 // 依次执行：检查已完成车辆、更新车辆激活状态、更新车辆位置、处理检查点
+// traceNodes参数用于记录车辆OD点
 func VehicleProcess(numWorkers, simTime int, g *simple.DirectedGraph, traceNodes []graph.Node) {
 	checkCompletedVehicle(simTime, g, traceNodes)
 	updateVehicleActiveStatus(numWorkers)
@@ -75,7 +76,7 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph, traceNodes []gr
 				}
 			}
 
-			// 更新追踪节点列表
+			// 更新OD点记录
 			var findO, findD bool
 			for _, node := range traceNodes {
 				if node.ID() == newO.ID() {

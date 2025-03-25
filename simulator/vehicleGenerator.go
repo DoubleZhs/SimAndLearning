@@ -162,7 +162,7 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node, traceN
 //   - n: 要创建的车辆数量
 //   - g: 路网图
 //   - nodes: 可用节点列表
-//   - traceNodes: 用于追踪的节点列表
+//   - traceNodes: 用于保存OD点的列表
 func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []graph.Node, traceNodes []graph.Node) {
 	if n <= 0 || len(nodes) == 0 {
 		return // 避免无效输入
@@ -210,7 +210,8 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 				}
 			}
 
-			// 仅在启用轨迹记录时更新追踪节点列表
+			// 仅在启用轨迹记录时添加OD点到traceNodes
+			// 注意：这里保留了OD点记录功能，因为它们在路径规划中仍然有用
 			if traceEnabled {
 				traceNodesMutex.Lock()
 				traceNodes = addNodeToTraceNodesIfMissing(traceNodes, oCell)
@@ -268,6 +269,7 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 
 // addNodeToTraceNodesIfMissing 如果节点不在追踪列表中，则添加它
 // 注意：此函数不是线程安全的，调用方必须持有适当的锁
+// 保留此函数用于OD点的收集
 func addNodeToTraceNodesIfMissing(traceNodes []graph.Node, node graph.Node) []graph.Node {
 	for _, existingNode := range traceNodes {
 		if existingNode.ID() == node.ID() {

@@ -9,7 +9,7 @@ import (
 )
 
 // SetupVehicleTrace 为车辆设置轨迹记录间隔
-// 如果interval为0或负数，则使用默认配置
+// 如果interval为0或负数，则使用配置中的TraceRecordInterval作为时间采样间隔
 func SetupVehicleTrace(vehicle *element.Vehicle, interval int) {
 	// 检查是否启用轨迹记录
 	cfg := config.GetConfig()
@@ -17,7 +17,7 @@ func SetupVehicleTrace(vehicle *element.Vehicle, interval int) {
 		return // 如果未启用轨迹记录，则不设置
 	}
 
-	// 如果未指定间隔或间隔无效，使用配置的间隔
+	// 如果未指定间隔或间隔无效，使用配置的时间采样间隔
 	if interval <= 0 {
 		if cfg.Trace.TraceRecordInterval > 0 {
 			interval = cfg.Trace.TraceRecordInterval
@@ -26,7 +26,7 @@ func SetupVehicleTrace(vehicle *element.Vehicle, interval int) {
 		}
 	}
 
-	// 设置车辆的轨迹记录间隔
+	// 设置车辆的轨迹记录时间间隔
 	vehicle.SetTraceInterval(interval)
 
 	// 车辆状态≥3表示已进入系统（包括缓冲区），应该开始记录轨迹

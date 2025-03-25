@@ -1,10 +1,13 @@
 package simulator
 
 import (
+	"encoding/json"
 	"fmt"
 	"graphCA/element"
 	"graphCA/utils"
 	"math"
+	"os"
+	"path/filepath"
 
 	"math/rand/v2"
 
@@ -340,4 +343,145 @@ func VerifyStarRingGraphConnectivity(g *simple.DirectedGraph) (bool, []string) {
 	}
 
 	return false, problems
+}
+
+// SaveGraphToJSON 将图结构保存为JSON文件
+//
+// 参数:
+//   - g: 要保存的图
+//   - nodes: 图中所有节点的映射
+//   - lights: 红绿灯节点的映射
+//   - filePath: 保存路径
+//
+// 返回:
+//   - error: 如果保存过程中发生错误，返回错误
+func SaveGraphToJSON(g *simple.DirectedGraph, nodes map[int64]graph.Node, lights map[int64]*element.TrafficLightCell, filePath string) error {
+	// 获取图的边和节点信息
+	graphData, err := GetGraphEdgesAndNodes(g, nodes, lights)
+	if err != nil {
+		return fmt.Errorf("获取图数据失败: %v", err)
+	}
+
+	// 将图数据转换为JSON格式
+	jsonData, err := json.MarshalIndent(graphData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("转换为JSON失败: %v", err)
+	}
+
+	// 确保文件目录存在
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("创建目录失败: %v", err)
+	}
+
+	// 写入文件
+	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	return nil
+}
+
+// GetGraphEdgesAndNodes 获取图的边和节点信息
+//
+// 参数:
+//   - g: 图结构
+//   - nodes: 节点映射
+//   - lights: 红绿灯节点映射
+//
+// 返回:
+//   - map[string]interface{}: 包含图结构信息的映射
+//   - error: 如果处理过程中发生错误，返回错误
+func GetGraphEdgesAndNodes(g *simple.DirectedGraph, nodes map[int64]graph.Node, lights map[int64]*element.TrafficLightCell) (map[string]interface{}, error) {
+	// 创建结果映射
+	result := make(map[string]interface{})
+
+	// 保存节点信息
+	nodesInfo := make([]map[string]interface{}, 0, len(nodes))
+	for id, node := range nodes {
+		nodeInfo := map[string]interface{}{
+			"id": id,
+		}
+
+		// 根据节点类型添加不同的信息
+		if cell, ok := node.(element.Cell); ok {
+			nodeInfo["maxSpeed"] = cell.MaxSpeed()
+			nodeInfo["capacity"] = cell.Capacity()
+
+			// 判断是否是红绿灯节点
+			if light, isLight := lights[id]; isLight {
+				nodeInfo["type"] = "trafficLight"
+				nodeInfo["interval"] = light.GetInterval()
+				nodeInfo["phaseInterval"] = light.GetTruePhaseInterval()
+			} else {
+				nodeInfo["type"] = "common"
+			}
+		} else {
+			nodeInfo["type"] = "unknown"
+		}
+
+		nodesInfo = append(nodesInfo, nodeInfo)
+	}
+	result["nodes"] = nodesInfo
+
+	// 保存边信息
+	edgesInfo := make([]map[string]interface{}, 0)
+	edges := g.Edges()
+	for edges.Next() {
+		edge := edges.Edge()
+		edgeInfo := map[string]interface{}{
+			"from": edge.From().ID(),
+			"to":   edge.To().ID(),
+		}
+		edgesInfo = append(edgesInfo, edgeInfo)
+	}
+	result["edges"] = edgesInfo
+
+	return result, nil
+}
+
+// SaveCycleGraph 创建并保存环形路网图
+//
+// 参数:
+//   - cellNum: 单元格总数
+//   - trafficLightInterval: 红绿灯间隔
+//   - initInterval: 红绿灯初始周期时长
+//   - filePath: 保存路径
+//
+// 返回:
+//   - *simple.DirectedGraph: 创建的有向图
+//   - map[int64]graph.Node: 图中所有节点的映射
+//   - map[int64]*element.TrafficLightCell: 红绿灯节点的映射
+//   - error: 如果保存过程中发生错误，返回错误
+func SaveCycleGraph(cellNum int, trafficLightInterval int, initInterval int, filePath string) (*simple.DirectedGraph, map[int64]graph.Node, map[int64]*element.TrafficLightCell, error) {
+	// 创建图
+	g, nodes, lights := CreateCycleGraph(cellNum, trafficLightInterval, initInterval)
+
+	// 保存图结构
+	err := SaveGraphToJSON(g, nodes, lights, filePath)
+
+	return g, nodes, lights, err
+}
+
+// SaveStarRingGraph 创建并保存星形环形混合路网结构
+//
+// 参数:
+//   - ringCellsPerDirection: 环形连接每个方向的元胞数量
+//   - starCellsPerDirection: 星形连接每个方向的元胞数量
+//   - initInterval: 红绿灯初始周期时长
+//   - filePath: 保存路径
+//
+// 返回:
+//   - *simple.DirectedGraph: 创建的有向图
+//   - map[int64]graph.Node: 图中所有节点的映射
+//   - map[int64]*element.TrafficLightCell: 红绿灯节点的映射
+//   - error: 如果保存过程中发生错误，返回错误
+func SaveStarRingGraph(ringCellsPerDirection int, starCellsPerDirection int, initInterval int, filePath string) (*simple.DirectedGraph, map[int64]graph.Node, map[int64]*element.TrafficLightCell, error) {
+	// 创建图
+	g, nodes, lights := CreateStarRingGraph(ringCellsPerDirection, starCellsPerDirection, initInterval)
+
+	// 保存图结构
+	err := SaveGraphToJSON(g, nodes, lights, filePath)
+
+	return g, nodes, lights, err
 }

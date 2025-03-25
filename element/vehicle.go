@@ -574,7 +574,7 @@ func (v *Vehicle) AddTracePoint(nodeID int64, time int) {
 
 // ShouldRecordTrace 判断当前是否应该记录轨迹
 // time: 当前时间
-// 如果是起点、终点或满足时间间隔条件，则返回true
+// 基于时间采样规则，如果是起点、终点或满足时间间隔条件，则返回true
 func (v *Vehicle) ShouldRecordTrace(time int) bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -592,7 +592,7 @@ func (v *Vehicle) ShouldRecordTrace(time int) bool {
 		return true
 	}
 
-	// 根据时间间隔决定是否记录
+	// 基于时间间隔决定是否记录 - 时间采样规则
 	interval := v.traceInterval
 	if interval <= 0 {
 		// 根据配置更新轨迹记录间隔

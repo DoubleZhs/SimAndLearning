@@ -253,31 +253,54 @@ func initializeSimulationEnvironment(cfg *config.Config) (*simple.DirectedGraph,
 	var g *simple.DirectedGraph
 	var nodesMap map[int64]graph.Node
 	var lights map[int64]*element.TrafficLightCell
+	var err error
+
+	// 获取当前时间作为文件名的一部分
+	timeStamp := time.Now().Format("20060102150405")
+	graphFilePath := fmt.Sprintf("./data/%s_%d_Graph.json", timeStamp, cfg.Vehicle.NumClosedVehicle)
 
 	// 根据配置选择创建的路网类型
 	switch cfg.Graph.GraphType {
 	case "cycle":
-		// 创建环形路网
-		g, nodesMap, lights = simulator.CreateCycleGraph(
+		// 创建环形路网并保存
+		g, nodesMap, lights, err = simulator.SaveCycleGraph(
 			cfg.Graph.CycleGraph.NumCell,
 			cfg.Graph.CycleGraph.LightIndexInterval,
 			cfg.TrafficLight.InitPhaseInterval,
+			graphFilePath,
 		)
+		if err != nil {
+			log.WriteLog(fmt.Sprintf("保存环形路网图失败: %v", err))
+		} else {
+			log.WriteLog(fmt.Sprintf("环形路网图已保存至: %s", graphFilePath))
+		}
 	case "starRing":
-		// 创建星形环形混合路网
-		g, nodesMap, lights = simulator.CreateStarRingGraph(
+		// 创建星形环形混合路网并保存
+		g, nodesMap, lights, err = simulator.SaveStarRingGraph(
 			cfg.Graph.StarRingGraph.RingCellsPerDirection,
 			cfg.Graph.StarRingGraph.StarCellsPerDirection,
 			cfg.TrafficLight.InitPhaseInterval,
+			graphFilePath,
 		)
+		if err != nil {
+			log.WriteLog(fmt.Sprintf("保存星形环形路网图失败: %v", err))
+		} else {
+			log.WriteLog(fmt.Sprintf("星形环形路网图已保存至: %s", graphFilePath))
+		}
 	default:
-		// 默认创建环形路网
+		// 默认创建环形路网并保存
 		log.WriteLog(fmt.Sprintf("未知的路网类型: %s，使用默认环形路网", cfg.Graph.GraphType))
-		g, nodesMap, lights = simulator.CreateCycleGraph(
+		g, nodesMap, lights, err = simulator.SaveCycleGraph(
 			cfg.Graph.CycleGraph.NumCell,
 			cfg.Graph.CycleGraph.LightIndexInterval,
 			cfg.TrafficLight.InitPhaseInterval,
+			graphFilePath,
 		)
+		if err != nil {
+			log.WriteLog(fmt.Sprintf("保存环形路网图失败: %v", err))
+		} else {
+			log.WriteLog(fmt.Sprintf("环形路网图已保存至: %s", graphFilePath))
+		}
 	}
 
 	numNodes := len(nodesMap)
@@ -316,21 +339,9 @@ func initializeSimulationEnvironment(cfg *config.Config) (*simple.DirectedGraph,
 	// 创建跟踪节点切片（用于记录轨迹数据）
 	var traceNodes []graph.Node
 	if cfg.Trace.Enabled {
-		// 根据配置决定跟踪节点的采样方式
-		if cfg.Trace.TraceRecordInterval > 1 {
-			// 每隔固定节点数选择一个作为跟踪节点
-			traceNodes = make([]graph.Node, 0, len(nodes)/cfg.Trace.TraceRecordInterval+1)
-			for i, node := range nodes {
-				if i%cfg.Trace.TraceRecordInterval == 0 {
-					traceNodes = append(traceNodes, node)
-				}
-			}
-			log.WriteLog(fmt.Sprintf("轨迹记录已启用，采样间隔: %d, 跟踪节点数: %d", cfg.Trace.TraceRecordInterval, len(traceNodes)))
-		} else {
-			// 使用所有节点
-			traceNodes = nodes
-			log.WriteLog("轨迹记录已启用，跟踪所有节点")
-		}
+		// 移除旧的空间采样逻辑，简化为直接使用所有节点
+		traceNodes = nodes
+		log.WriteLog("轨迹记录已启用")
 	} else {
 		traceNodes = nil
 		log.WriteLog("轨迹记录已禁用")

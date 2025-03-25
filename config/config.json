@@ -1,7 +1,7 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 60
+        "simDay": 1
     },
     "graph": {
         "graphType": "cycle",

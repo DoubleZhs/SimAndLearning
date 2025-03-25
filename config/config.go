@@ -73,7 +73,7 @@ type TraceConfig struct {
 	// 是否启用轨迹记录功能
 	Enabled bool `json:"enabled"`
 	// 轨迹记录间隔（车辆移动多少步记录一次位置）
-	// 如果不设置或设置为0，系统将根据路径长度自动确定合适的记录间隔
+	// 控制车辆移动过程中的轨迹记录频率，即每隔多少个时间步记录一次位置
 	TraceRecordInterval int `json:"traceRecordInterval"`
 	// 轨迹数据写入间隔（时间步），独立于其他数据的写入间隔
 	WriteInterval int `json:"writeInterval"`
