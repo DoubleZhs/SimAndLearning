@@ -28,21 +28,14 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph) {
 		return
 	}
 
-	// 使用读写锁以允许并发读取
-	completedVehiclesMutex.RLock()
-	// 创建临时列表以避免在迭代过程中修改原映射
-	vehiclesToProcess := make([]*element.Vehicle, 0, len(completedVehicles))
-	for vehicle := range completedVehicles {
-		vehiclesToProcess = append(vehiclesToProcess, vehicle)
-	}
-	completedVehiclesMutex.RUnlock()
-
 	// 获取配置的路径查找器
 	pathFinder := utils.GetPathFinder()
 
-	for _, vehicle := range vehiclesToProcess {
+	for vehicle := range completedVehicles {
 		// 记录车辆数据
 		recorder.RecordVehicleData(vehicle)
+		// 记录车辆轨迹数据
+		recorder.RecordVehicleTrace(vehicle)
 
 		// 仅处理闭环车辆（需要重新进入系统的车辆）
 		if vehicle.Flag() {
@@ -246,9 +239,6 @@ func updateVehiclePosition(numWorkers, simTime int) {
 
 	// 处理完成的车辆
 	for vehicle := range completedVehicleChan {
-		// 执行SystemOut操作，确保车辆被正确卸载
-		vehicle.SystemOut(simTime)
-
 		// 更新各种状态
 		activeVehiclesMutex.Lock()
 		delete(activeVehicles, vehicle)

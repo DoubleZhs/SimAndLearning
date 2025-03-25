@@ -47,3 +47,12 @@ func appendToCSV(filename string, data [][]string) {
 		panic(err)
 	}
 }
+
+// fileExists 检查文件是否存在
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}

@@ -2,9 +2,9 @@ package simulator
 
 import (
 	"fmt"
+	"runtime"
 	"simAndLearning/log"
 	"simAndLearning/recorder"
-	"runtime"
 	"time"
 )
 
@@ -21,6 +21,10 @@ func WriteData(dataFiles map[string]string) {
 	// 直接写入数据
 	recorder.WriteToSystemDataCSV(dataFiles["system"])
 	recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
+	// 写入轨迹数据
+	if traceFile, ok := dataFiles["trace"]; ok {
+		recorder.WriteToTraceDataCSV(traceFile)
+	}
 
 	// 手动触发垃圾回收以减少内存占用
 	runtime.GC()
@@ -44,6 +48,10 @@ func FinishSimulation(dataFiles map[string]string) {
 
 	recorder.WriteToSystemDataCSV(dataFiles["system"])
 	recorder.WriteToVehicleDataCSV(dataFiles["vehicle"])
+	// 写入轨迹数据
+	if traceFile, ok := dataFiles["trace"]; ok {
+		recorder.WriteToTraceDataCSV(traceFile)
+	}
 
 	elapsedTime := time.Since(startTime)
 	log.WriteLog(fmt.Sprintf("Final data write completed in %v", elapsedTime))

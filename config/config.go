@@ -58,6 +58,7 @@ type DemandConfig struct {
 // VehicleConfig 保存车辆相关的配置项
 type VehicleConfig struct {
 	NumClosedVehicle int `json:"numClosedVehicle"`
+	TraceInterval    int `json:"traceInterval"`
 }
 
 // TrafficLightChange 表示流量灯变化的配置
@@ -171,6 +172,11 @@ func LoadConfig(filename string) error {
 
 	if config.TripDistance.MaxDistMultiplier <= 0 {
 		config.TripDistance.MaxDistMultiplier = 1.0 // 默认不缩放最大距离
+	}
+
+	// 设置车辆轨迹记录间隔的默认值
+	if config.Vehicle.TraceInterval <= 0 {
+		config.Vehicle.TraceInterval = 1 // 默认每个时间步记录
 	}
 
 	globalConfig = config

@@ -86,16 +86,22 @@ func initializeResources(cfg *config.Config, initTime string) (string, map[strin
 
 	log.WriteLog(fmt.Sprintf("Concurrent Volume in Vehicle Process: %d", runtime.GOMAXPROCS(0)))
 
+	// 设置一天的时间步数，用于轨迹数据按天拆分
+	recorder.SetOneDayTimeSteps(cfg.Simulation.OneDayTimeSteps)
+
 	// Initialize CSV data files
 	systemDataFile := fmt.Sprintf("./data/%s_%d_SystemData.csv", initTime, cfg.Vehicle.NumClosedVehicle)
 	vehicleDataFile := fmt.Sprintf("./data/%s_%d_VehicleData.csv", initTime, cfg.Vehicle.NumClosedVehicle)
+	traceDataFile := fmt.Sprintf("./data/%s_%d_TraceData.csv", initTime, cfg.Vehicle.NumClosedVehicle)
 
 	recorder.InitSystemDataCSV(systemDataFile)
 	recorder.InitVehicleDataCSV(vehicleDataFile)
+	recorder.InitTraceDataCSV(traceDataFile)
 
 	dataFiles := map[string]string{
 		"system":  systemDataFile,
 		"vehicle": vehicleDataFile,
+		"trace":   traceDataFile,
 	}
 
 	return logFile, dataFiles

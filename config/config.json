@@ -19,13 +19,14 @@
         "intervalWriteOtherData": 14400
     },
     "demand": {
-        "multiplier": 45000,
+        "multiplier": 40000,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
     },
     "vehicle": {
-        "numClosedVehicle": 100
+        "numClosedVehicle": 100,
+        "traceInterval": 40
     },
     "trafficLight": {
         "initPhaseInterval": 40,
