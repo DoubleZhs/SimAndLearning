@@ -4,7 +4,7 @@
         "simDay": 3
     },
     "graph": {
-        "graphType": "cycle",
+        "graphType": "starRing",
         "cycleGraph": {
             "numCell": 8000,
             "lightIndexInterval": 800
@@ -16,10 +16,10 @@
     },
     "logging": {
         "intervalWriteToLog": 1200,
-        "intervalWriteOtherData": 14400
+        "intervalWriteOtherData": 7200
     },
     "demand": {
-        "multiplier": 40000,
+        "multiplier": 25000,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
@@ -42,7 +42,7 @@
         ]
     },
     "path": {
-        "pathMethod": "shortest",
+        "pathMethod": "kShortest",
         "kShortest": {
             "k": 3,
             "selectionStrategy": "weighted",
@@ -50,7 +50,7 @@
         }
     },
     "tripDistance": {
-        "enableDistanceLimit": true,
+        "enableDistanceLimit": false,
         "probShortTrip": 0.54,
         "probMediumTrip": 0.75,
         "probLongTrip": 0.85,

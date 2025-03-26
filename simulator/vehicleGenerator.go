@@ -33,16 +33,6 @@ func randomSlowingProbability() float64 {
 	return rand.Float64() / 2.0
 }
 
-// randomLowVelocity 随机生成较低基础速度
-func randomLowVelocity() int {
-	return 1 + rand.IntN(2)
-}
-
-// randomHighVelocity 随机生成较高基础速度
-func randomHighVelocity() int {
-	return 1 + rand.IntN(3)
-}
-
 // InitFixedVehicle 初始化固定数量的车辆
 // 创建n个闭环车辆并将其添加到等待队列
 // params:
@@ -120,9 +110,22 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node) {
 			// 将车辆加入缓冲区
 			vehicle.BufferIn(0)
 
+			// 添加到等待队列
+			waitingVehiclesMutex.Lock()
+			waitingVehicles[vehicle] = struct{}{}
+			waitingVehiclesMutex.Unlock()
+
+			// 更新等待车辆计数
+			atomic.AddInt64(&numVehiclesWaiting, 1)
+
 			// 更新车辆激活状态
 			if vehicle.UpdateActiveState() {
 				vehicle.SystemIn()
+
+				waitingVehiclesMutex.Lock()
+				delete(waitingVehicles, vehicle)
+				waitingVehiclesMutex.Unlock()
+				atomic.AddInt64(&numVehiclesWaiting, -1)
 				activeVehiclesMutex.Lock()
 				activeVehicles[vehicle] = struct{}{}
 				activeVehiclesMutex.Unlock()
