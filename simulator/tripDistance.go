@@ -1,8 +1,8 @@
 package simulator
 
 import (
-	"simAndLearning/config"
 	"math"
+	"simAndLearning/config"
 
 	"math/rand/v2"
 
@@ -38,7 +38,6 @@ const (
 )
 
 // 获取距离概率分布阈值，优先使用配置文件中的值，如果未配置则使用默认值
-// 所有概率都放缩到EXTREME以内
 func getProbabilities() (float64, float64, float64, float64, float64) {
 	cfg := config.GetConfig()
 	// 如果配置为nil或未设置相关配置，则使用默认值
@@ -115,7 +114,6 @@ func isDistanceLimitEnabled() bool {
 
 // TripDistanceLim 根据概率分布随机生成一个行程距离上限
 // 返回换算成单元格数量的距离上限
-// 已更新为只使用EXTREME以内的距离
 func TripDistanceLim() int {
 	// 获取配置的概率分布
 	probShort, probMedium, probLong, probVeryLong, _ := getProbabilities()
@@ -146,7 +144,6 @@ func TripDistanceLim() int {
 
 // TripDistanceRange 生成一个行程距离范围
 // 返回换算成单元格数量的最小和最大距离
-// 已更新为只使用EXTREME以内的距离
 func TripDistanceRange() (int, int) {
 	// 检查是否启用距离限制
 	if !isDistanceLimitEnabled() {
@@ -204,8 +201,3 @@ func GetRandomDestination(nodes []graph.Node, excludeNode graph.Node) graph.Node
 	// 随机选择一个节点作为目的地
 	return availableNodes[rand.IntN(len(availableNodes))]
 }
-
-// 注释掉的测试函数 - 保留以备将来参考
-// func TripDistanceRange() (int, int) {
-//     return 200, 6000
-// }

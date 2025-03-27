@@ -3,11 +3,11 @@ package simulator
 import (
 	"encoding/json"
 	"fmt"
-	"simAndLearning/element"
-	"simAndLearning/utils"
 	"math"
 	"os"
 	"path/filepath"
+	"simAndLearning/element"
+	"simAndLearning/utils"
 
 	"math/rand/v2"
 
@@ -484,4 +484,225 @@ func SaveStarRingGraph(ringCellsPerDirection int, starCellsPerDirection int, ini
 	err := SaveGraphToJSON(g, nodes, lights, filePath)
 
 	return g, nodes, lights, err
+}
+
+// CreateGridGraph 创建一个网格状路网图
+//
+// 参数:
+//   - rows: 网格的行数
+//   - cols: 网格的列数
+//   - cellsPerEdge: 每条边上的元胞数
+//   - initInterval: 红绿灯初始周期时长
+//
+// 返回:
+//   - *simple.DirectedGraph: 创建的有向图
+//   - map[int64]graph.Node: 图中所有节点的映射
+//   - map[int64]*element.TrafficLightCell: 红绿灯节点的映射
+func CreateGridGraph(rows, cols, cellsPerEdge, initInterval int) (*simple.DirectedGraph, map[int64]graph.Node, map[int64]*element.TrafficLightCell) {
+	// 参数验证
+	if rows <= 0 || cols <= 0 {
+		panic("rows and cols must be positive")
+	}
+	if cellsPerEdge <= 0 {
+		panic("cellsPerEdge must be positive")
+	}
+	if initInterval <= 0 {
+		panic("initInterval must be positive")
+	}
+
+	// 创建新的有向图
+	g := simple.NewDirectedGraph()
+
+	// 计算总节点数：交叉口节点 + 道路上的元胞节点
+	intersectionCount := rows * cols
+	// 水平方向有rows*(cols-1)条边，垂直方向有(rows-1)*cols条边，每条边都是双向的，所以乘以2
+	roadEdgeCount := 2 * (rows*(cols-1) + (rows-1)*cols)
+	roadCellCount := roadEdgeCount * cellsPerEdge // 所有道路上的元胞
+	totalNodes := intersectionCount + roadCellCount
+
+	// 创建存储节点的映射
+	nodes := make(map[int64]graph.Node, totalNodes)
+	lights := make(map[int64]*element.TrafficLightCell) // 空映射，因为不创建红绿灯
+
+	// 节点ID计数器
+	nextID := int64(0)
+
+	// 创建交叉口节点 (row行 × col列的网格)
+	intersections := make([][]graph.Node, rows)
+	for i := 0; i < rows; i++ {
+		intersections[i] = make([]graph.Node, cols)
+		for j := 0; j < cols; j++ {
+			// 所有交叉口都使用普通单元格，但容量设置为2
+			node := element.NewCommonCell(
+				nextID, // 单元格ID
+				5,      // 最大速度
+				2.0,    // 容量设置为2，增加交叉口容量
+			)
+
+			g.AddNode(node)
+			nodes[nextID] = node
+			intersections[i][j] = node
+			nextID++
+		}
+	}
+
+	// 创建道路元胞并连接交叉口（双向连接）
+	// 水平方向的连接
+	for i := 0; i < rows; i++ {
+		for j := 0; j < cols-1; j++ {
+			from := intersections[i][j]
+			to := intersections[i][j+1]
+
+			// 创建从左到右的道路元胞和连接
+			createRoadCells(g, nodes, from, to, cellsPerEdge, &nextID)
+
+			// 创建从右到左的道路元胞和连接
+			createRoadCells(g, nodes, to, from, cellsPerEdge, &nextID)
+		}
+	}
+
+	// 垂直方向的连接
+	for j := 0; j < cols; j++ {
+		for i := 0; i < rows-1; i++ {
+			from := intersections[i][j]
+			to := intersections[i+1][j]
+
+			// 创建从上到下的道路元胞和连接
+			createRoadCells(g, nodes, from, to, cellsPerEdge, &nextID)
+
+			// 创建从下到上的道路元胞和连接
+			createRoadCells(g, nodes, to, from, cellsPerEdge, &nextID)
+		}
+	}
+
+	return g, nodes, lights
+}
+
+// createRoadCells 创建道路元胞并连接两个节点
+func createRoadCells(g *simple.DirectedGraph, nodes map[int64]graph.Node, from, to graph.Node, cellsPerEdge int, nextID *int64) {
+	// 创建道路元胞
+	roadCells := make([]graph.Node, cellsPerEdge)
+	for k := 0; k < cellsPerEdge; k++ {
+		cell := element.NewCommonCell(
+			*nextID, // 单元格ID
+			5,       // 最大速度
+			1.0,     // 容量为1，标准道路容量
+		)
+		g.AddNode(cell)
+		nodes[*nextID] = cell
+		roadCells[k] = cell
+		(*nextID)++
+	}
+
+	// 连接起点到第一个道路元胞
+	if cellsPerEdge > 0 {
+		g.SetEdge(simple.Edge{F: from, T: roadCells[0]})
+
+		// 连接道路元胞
+		for k := 0; k < cellsPerEdge-1; k++ {
+			g.SetEdge(simple.Edge{F: roadCells[k], T: roadCells[k+1]})
+		}
+
+		// 连接最后一个道路元胞到终点
+		g.SetEdge(simple.Edge{F: roadCells[cellsPerEdge-1], T: to})
+	} else {
+		// 如果没有道路元胞，直接连接起点到终点
+		g.SetEdge(simple.Edge{F: from, T: to})
+	}
+}
+
+// SaveGridGraph 创建网格状路网并保存到JSON文件
+func SaveGridGraph(rows, cols, cellsPerEdge, initInterval int, filePath string) (*simple.DirectedGraph, map[int64]graph.Node, map[int64]*element.TrafficLightCell, error) {
+	g, nodes, lights := CreateGridGraph(rows, cols, cellsPerEdge, initInterval)
+
+	// 确保目录存在
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	if err := SaveGraphToJSON(g, nodes, lights, filePath); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to save graph to JSON: %w", err)
+	}
+
+	return g, nodes, lights, nil
+}
+
+// VerifyGridGraphConnectivity 验证网格图的连通性
+// 参数:
+//   - g: 要验证的图
+//
+// 返回:
+//   - bool: 图是否强连通
+//   - []string: 连通性问题的详细信息（如果有）
+func VerifyGridGraphConnectivity(g *simple.DirectedGraph) (bool, []string) {
+	// 使用utils包中的IsStronglyConnected函数
+	isStronglyConnected := utils.IsStronglyConnected(g)
+
+	// 如果图已经是强连通的，直接返回
+	if isStronglyConnected {
+		return true, nil
+	}
+
+	// 如果图不是强连通的，进行更详细的分析
+	problems := make([]string, 0)
+
+	// 获取图中所有节点
+	nodes := graph.NodesOf(g.Nodes())
+	nodeCount := len(nodes)
+
+	// 随机选择10对节点进行连通性检查（全部检查可能太耗时）
+	maxChecks := 10
+	if nodeCount <= 10 {
+		maxChecks = nodeCount
+	}
+
+	checked := 0
+	for checked < maxChecks {
+		// 随机选择两个不同的节点
+		i := rand.IntN(nodeCount)
+		j := rand.IntN(nodeCount)
+		if i == j {
+			continue
+		}
+
+		// 检查从节点i到节点j是否可达（使用BFS）
+		reachable := checkReachability(g, nodes[i], nodes[j])
+		if !reachable {
+			problems = append(problems, fmt.Sprintf("节点 %d 到节点 %d 不可达", nodes[i].ID(), nodes[j].ID()))
+		}
+
+		checked++
+	}
+
+	return false, problems
+}
+
+// checkReachability 检查两个节点之间是否可达
+func checkReachability(g *simple.DirectedGraph, start, end graph.Node) bool {
+	// 使用BFS算法
+	visited := make(map[int64]bool)
+	queue := []graph.Node{start}
+	visited[start.ID()] = true
+
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+
+		if node.ID() == end.ID() {
+			return true
+		}
+
+		// 将所有未访问的邻居节点加入队列
+		neighbors := g.From(node.ID())
+		for neighbors.Next() {
+			neighbor := neighbors.Node()
+			if !visited[neighbor.ID()] {
+				visited[neighbor.ID()] = true
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+
+	return false
 }

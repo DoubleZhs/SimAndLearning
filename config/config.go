@@ -25,7 +25,7 @@ type SimulationConfig struct {
 
 // GraphConfig 保存路网相关的配置项
 type GraphConfig struct {
-	// 路网类型: "cycle" - 环形路网, "starRing" - 星形环形混合路网
+	// 路网类型: "cycle" - 环形路网, "starRing" - 星形环形混合路网, "grid" - 网格状路网
 	GraphType string `json:"graphType"`
 
 	// 环形路网参数
@@ -39,6 +39,13 @@ type GraphConfig struct {
 		RingCellsPerDirection int `json:"ringCellsPerDirection"`
 		StarCellsPerDirection int `json:"starCellsPerDirection"`
 	} `json:"starRingGraph"`
+
+	// 网格状路网参数
+	GridGraph struct {
+		Rows         int `json:"rows"`
+		Cols         int `json:"cols"`
+		CellsPerEdge int `json:"cellsPerEdge"`
+	} `json:"gridGraph"`
 }
 
 // LoggingConfig 保存日志记录相关的配置项
@@ -145,6 +152,17 @@ func LoadConfig(filename string) error {
 	}
 	if config.Graph.StarRingGraph.StarCellsPerDirection <= 0 {
 		config.Graph.StarRingGraph.StarCellsPerDirection = 400 // 默认星形路径单元格数
+	}
+
+	// 设置网格路网参数的默认值
+	if config.Graph.GridGraph.Rows <= 0 {
+		config.Graph.GridGraph.Rows = 5 // 默认行数
+	}
+	if config.Graph.GridGraph.Cols <= 0 {
+		config.Graph.GridGraph.Cols = 5 // 默认列数
+	}
+	if config.Graph.GridGraph.CellsPerEdge <= 0 {
+		config.Graph.GridGraph.CellsPerEdge = 10 // 默认每条边上的元胞数
 	}
 
 	// 设置路径配置的默认值

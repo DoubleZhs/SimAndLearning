@@ -145,6 +145,20 @@ func initializeSimulationEnvironment(cfg *config.Config, initTime string) (*simp
 		} else {
 			log.WriteLog(fmt.Sprintf("Star-ring graph saved to: %s", graphFilePath))
 		}
+	case "grid":
+		// Create and save grid graph
+		g, nodesMap, lights, err = simulator.SaveGridGraph(
+			cfg.Graph.GridGraph.Rows,
+			cfg.Graph.GridGraph.Cols,
+			cfg.Graph.GridGraph.CellsPerEdge,
+			cfg.TrafficLight.InitPhaseInterval,
+			graphFilePath,
+		)
+		if err != nil {
+			log.WriteLog(fmt.Sprintf("Failed to save grid graph: %v", err))
+		} else {
+			log.WriteLog(fmt.Sprintf("Grid graph saved to: %s", graphFilePath))
+		}
 	default:
 		// Default to cycle graph
 		log.WriteLog(fmt.Sprintf("Unknown graph type: %s, using default cycle graph", cfg.Graph.GraphType))
@@ -186,6 +200,18 @@ func initializeSimulationEnvironment(cfg *config.Config, initTime string) (*simp
 	if cfg.Graph.GraphType == "starRing" && !gConnect {
 		isConnected, problems := simulator.VerifyStarRingGraphConnectivity(g)
 		log.WriteLog(fmt.Sprintf("StarRing Graph Detailed Connectivity Check: %v", isConnected))
+		if !isConnected && len(problems) > 0 {
+			log.WriteLog("Connectivity Issues:")
+			for _, problem := range problems {
+				log.WriteLog(fmt.Sprintf("- %s", problem))
+			}
+		}
+	}
+
+	// For grid graphs, use grid-specific connectivity check
+	if cfg.Graph.GraphType == "grid" && !gConnect {
+		isConnected, problems := simulator.VerifyGridGraphConnectivity(g)
+		log.WriteLog(fmt.Sprintf("Grid Graph Detailed Connectivity Check: %v", isConnected))
 		if !isConnected && len(problems) > 0 {
 			log.WriteLog("Connectivity Issues:")
 			for _, problem := range problems {

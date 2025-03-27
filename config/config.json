@@ -1,10 +1,10 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 60
+        "simDay": 4
     },
     "graph": {
-        "graphType": "starRing",
+        "graphType": "grid",
         "cycleGraph": {
             "numCell": 8000,
             "lightIndexInterval": 800
@@ -12,6 +12,11 @@
         "starRingGraph": {
             "ringCellsPerDirection": 600,
             "starCellsPerDirection": 400
+        },
+        "gridGraph": {
+            "rows": 5,
+            "cols": 5,
+            "cellsPerEdge": 50
         }
     },
     "logging": {
@@ -19,7 +24,7 @@
         "intervalWriteOtherData": 7200
     },
     "demand": {
-        "multiplier": 26500,
+        "multiplier": 50000,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
@@ -32,11 +37,11 @@
         "initPhaseInterval": 40,
         "changes": [
             {
-                "day": 21,
+                "day": 2,
                 "multiplier": 2
             },
             {
-                "day": 41,
+                "day": 3,
                 "multiplier": 2
             }
         ]
@@ -46,7 +51,7 @@
         "kShortest": {
             "k": 3,
             "selectionStrategy": "weighted",
-            "lengthWeightFactor": 0.35
+            "lengthWeightFactor": 0.25
         }
     },
     "tripDistance": {
