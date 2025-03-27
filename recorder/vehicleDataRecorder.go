@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"simAndLearning/element"
 	"strconv"
+	"strings"
 	"sync"
+
+	"gonum.org/v1/gonum/graph"
 )
 
 var (
@@ -26,6 +29,9 @@ func getVehicleData(vehicle *element.Vehicle) []string {
 	destinationId := vehicle.Destination().ID()
 	pathlength := vehicle.PathLength()
 
+	// 获取路径
+	simplePath := formatSimplePath(vehicle.GetPath())
+
 	return []string{
 		strconv.FormatInt(index, 10),         // 车辆 ID
 		strconv.Itoa(acceleration),           // 车辆加速度
@@ -37,12 +43,27 @@ func getVehicleData(vehicle *element.Vehicle) []string {
 		fmt.Sprintf("%.4f", tag),             // 标签
 		strconv.FormatBool(flag),             // 是否为封闭系统车辆
 		strconv.Itoa(pathlength),             // 路径长度（元胞数）
+		simplePath,                           // 车辆路径
 	}
+}
+
+// formatSimplePath 将车辆路径格式化为字符串
+func formatSimplePath(path []graph.Node) string {
+	if path == nil || len(path) == 0 {
+		return "[]"
+	}
+
+	nodeIds := make([]string, len(path))
+	for i, node := range path {
+		nodeIds[i] = strconv.FormatInt(node.ID(), 10)
+	}
+
+	return "[" + strings.Join(nodeIds, ",") + "]"
 }
 
 func InitVehicleDataCSV(filename string) {
 	header := []string{
-		"Vehicle ID", "Acceleration", "SlowingPro", "Origin", "Destination", "In Time", "Arrival Time", "Tag", "ClosedVehicle", "PathLength",
+		"Vehicle ID", "Acceleration", "SlowingPro", "Origin", "Destination", "In Time", "Arrival Time", "Tag", "ClosedVehicle", "PathLength", "Path",
 	}
 	initializeCSV(filename, header)
 }

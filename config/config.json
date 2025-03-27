@@ -1,7 +1,7 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 3
+        "simDay": 60
     },
     "graph": {
         "graphType": "starRing",
@@ -19,7 +19,7 @@
         "intervalWriteOtherData": 7200
     },
     "demand": {
-        "multiplier": 25000,
+        "multiplier": 26500,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
@@ -32,11 +32,11 @@
         "initPhaseInterval": 40,
         "changes": [
             {
-                "day": 2,
+                "day": 21,
                 "multiplier": 2
             },
             {
-                "day": 3,
+                "day": 41,
                 "multiplier": 2
             }
         ]
