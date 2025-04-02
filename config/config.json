@@ -1,10 +1,10 @@
 {
     "simulation": {
         "oneDayTimeSteps": 57600,
-        "simDay": 4
+        "simDay": 9
     },
     "graph": {
-        "graphType": "grid",
+        "graphType": "starRing",
         "cycleGraph": {
             "numCell": 8000,
             "lightIndexInterval": 800
@@ -24,7 +24,7 @@
         "intervalWriteOtherData": 7200
     },
     "demand": {
-        "multiplier": 50000,
+        "multiplier": 25000,
         "fixedNum": 0,
         "dayRandomDisRange": 0.1,
         "randomDisRange": 0.2
@@ -37,11 +37,11 @@
         "initPhaseInterval": 40,
         "changes": [
             {
-                "day": 2,
+                "day": 4,
                 "multiplier": 2
             },
             {
-                "day": 3,
+                "day": 7,
                 "multiplier": 2
             }
         ]
@@ -51,7 +51,7 @@
         "kShortest": {
             "k": 3,
             "selectionStrategy": "weighted",
-            "lengthWeightFactor": 0.25
+            "lengthWeightFactor": 0.2
         }
     },
     "tripDistance": {

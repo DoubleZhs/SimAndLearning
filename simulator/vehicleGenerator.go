@@ -72,11 +72,15 @@ func InitFixedVehicle(n int, g *simple.DirectedGraph, nodes []graph.Node) {
 				// 从可达节点中随机选择一个作为终点
 				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
 			} else {
-				// 如果不启用距离限制，直接随机选择目的地
-				dCell = GetRandomDestination(nodes, oCell)
-				if dCell == nil {
-					return
+				// 即使不启用距离限制，也确保最小距离在1英里以上
+				minLength, _ := TripDistanceRange() // 使用TripDistanceRange获取最小距离，已确保大于1英里
+				allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, 1000000)
+				if len(allowedDCells) == 0 {
+					return // 如果没有合适的终点，返回
 				}
+
+				// 从可达节点中随机选择一个作为终点
+				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
 			}
 
 			// 创建新车辆
@@ -176,11 +180,15 @@ func GenerateScheduleVehicle(simTime, n int, g *simple.DirectedGraph, nodes []gr
 				// 从可达节点中随机选择一个作为终点
 				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
 			} else {
-				// 如果不启用距离限制，直接随机选择目的地
-				dCell = GetRandomDestination(nodes, oCell)
-				if dCell == nil {
-					return
+				// 即使不启用距离限制，也确保最小距离在1英里以上
+				minLength, _ := TripDistanceRange() // 使用TripDistanceRange获取最小距离，已确保大于1英里
+				allowedDCells := utils.AccessibleNodesWithinRange(g, oCell, minLength, 1000000)
+				if len(allowedDCells) == 0 {
+					return // 如果没有合适的终点，返回
 				}
+
+				// 从可达节点中随机选择一个作为终点
+				dCell = allowedDCells[rand.IntN(len(allowedDCells))]
 			}
 
 			// 创建新车辆

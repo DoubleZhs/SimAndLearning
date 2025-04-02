@@ -55,23 +55,33 @@ func checkCompletedVehicle(simTime int, g *simple.DirectedGraph) {
 
 				newD = allowedDCells[rand.IntN(len(allowedDCells))]
 			} else {
-				// 如果不启用距离限制，直接随机选择目的地
-				// 获取图中所有节点
-				nodes := graph.NodesOf(g.Nodes())
-				newD = GetRandomDestination(nodes, newO)
-				if newD == nil {
-					continue
+				// 即使不启用距离限制，也确保最小距离在1英里以上
+				minLength, _ := TripDistanceRange() // 使用TripDistanceRange获取最小距离，已确保大于1英里
+				allowedDCells := utils.AccessibleNodesWithinRange(g, newO, minLength, 1000000)
+				if len(allowedDCells) == 0 {
+					continue // 如果没有合适的终点，跳过此车辆
 				}
+
+				// 从可达节点中随机选择一个作为终点
+				newD = allowedDCells[rand.IntN(len(allowedDCells))]
 			}
 
-			// 创建全新的闭环车辆，生成随机属性，不再保留原车辆的属性
+			// 保留原车辆的ID和属性，重新设置起点和终点
+			// 获取原车辆的各项属性
+			vehicleID := vehicle.Index()
+			vehicleVelocity := vehicle.Velocity()
+			vehicleAcceleration := vehicle.Acceleration()
+			vehicleOccupy := vehicle.Occupy() // 使用Occupy方法获取原车辆的占用空间
+			vehicleSlowingProb := vehicle.SlowingProb()
+
+			// 创建新车辆，保持原有属性
 			newVehicle := element.NewVehicle(
-				getNextVehicleID(),         // 获取新的车辆ID
-				randomVelocity(),           // 随机初始速度
-				randomAcceleration(),       // 随机加速度
-				1.0,                        // 车辆长度
-				randomSlowingProbability(), // 随机减速概率
-				true,                       // 保持为闭环车辆(flag=true)
+				vehicleID,           // 保持原车辆ID
+				vehicleVelocity,     // 保持原车辆速度
+				vehicleAcceleration, // 保持原车辆加速度
+				vehicleOccupy,       // 保持原车辆占用空间
+				vehicleSlowingProb,  // 保持原车辆减速概率
+				true,                // 保持为闭环车辆(flag=true)
 			)
 
 			if ok, err := newVehicle.SetOD(g, newO, newD); !ok {

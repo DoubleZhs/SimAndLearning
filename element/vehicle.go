@@ -8,7 +8,6 @@ import (
 
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
-	// 添加config包的导入，请根据实际项目结构调整路径
 )
 
 // Vehicle 表示一个车辆
@@ -92,6 +91,11 @@ func (v *Vehicle) Acceleration() int {
 // SlowingProb 返回车辆随机减速概率
 func (v *Vehicle) SlowingProb() float64 {
 	return v.slowingProb
+}
+
+// Occupy 返回车辆占用空间
+func (v *Vehicle) Occupy() float64 {
+	return v.occupy
 }
 
 // State 返回车辆当前状态
@@ -402,15 +406,15 @@ func (v *Vehicle) calculateGap() int {
 			break
 		}
 
-		// 检查是否是交叉路口(入度>1)
-		toNodes := v.graph.To(node.ID())
-		inDegree := 0
-		for toNodes.Next() {
-			inDegree++
+		// 检查是否是交叉路口(出度>1)
+		fromNodes := v.graph.From(node.ID())
+		outDegree := 0
+		for fromNodes.Next() {
+			outDegree++
 		}
 
 		// 交叉路口有通过概率
-		if inDegree > 1 {
+		if outDegree > 1 {
 			passProbability := 0.8
 			if rand.Float64() > passProbability {
 				return gap

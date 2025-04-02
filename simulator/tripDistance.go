@@ -26,7 +26,7 @@ const (
 	DEFAULT_PROB_EXTREME     float64 = 1.00 // 极长旅行概率(<=30英里)，原0.95放缩为1.0
 
 	// 各个距离级别的上限(英里)
-	DIST_VERY_SHORT float64 = 1.00
+	DIST_VERY_SHORT float64 = 1.01 // 修改为1.01英里，确保最短出行距离在1英里以上
 	DIST_SHORT      float64 = 3.85
 	DIST_MEDIUM     float64 = 7.65
 	DIST_LONG       float64 = 11.59
@@ -148,7 +148,9 @@ func TripDistanceRange() (int, int) {
 	// 检查是否启用距离限制
 	if !isDistanceLimitEnabled() {
 		// 如果未启用距离限制，返回一个非常大的范围（实际上不限制）
-		return 1, 1000000 // 几乎不限制距离
+		// 但确保最小距离在1英里以上
+		minLength := int(math.Round(DIST_VERY_SHORT * MILE_TO_KM * 1000 / CELL_LENGTH))
+		return minLength, 1000000 // 最小距离设为DIST_VERY_SHORT，最大距离几乎不限制
 	}
 
 	// 获取配置的概率分布

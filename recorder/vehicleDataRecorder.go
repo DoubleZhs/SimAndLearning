@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"gonum.org/v1/gonum/graph"
 )
@@ -13,6 +14,7 @@ import (
 var (
 	vehicleDataCache [][]string = make([][]string, 0)
 	vehicleDataMutex sync.Mutex = sync.Mutex{}
+	recordIndex      int64      = 0 // 递增的唯一索引
 )
 
 func RecordVehicleData(vehicle *element.Vehicle) {
@@ -22,6 +24,9 @@ func RecordVehicleData(vehicle *element.Vehicle) {
 }
 
 func getVehicleData(vehicle *element.Vehicle) []string {
+	// 生成唯一递增索引
+	idx := atomic.AddInt64(&recordIndex, 1)
+
 	// 基本信息
 	index, acceleration, slowingProb, inTime, outTime, tag, flag := vehicle.Report()
 	// 起终点ID
@@ -33,6 +38,7 @@ func getVehicleData(vehicle *element.Vehicle) []string {
 	simplePath := formatSimplePath(vehicle.GetPath())
 
 	return []string{
+		strconv.FormatInt(idx, 10),           // 新增的唯一索引
 		strconv.FormatInt(index, 10),         // 车辆 ID
 		strconv.Itoa(acceleration),           // 车辆加速度
 		fmt.Sprintf("%.4f", slowingProb),     // 减速概率
@@ -63,7 +69,7 @@ func formatSimplePath(path []graph.Node) string {
 
 func InitVehicleDataCSV(filename string) {
 	header := []string{
-		"Vehicle ID", "Acceleration", "SlowingPro", "Origin", "Destination", "In Time", "Arrival Time", "Tag", "ClosedVehicle", "PathLength", "Path",
+		"Trip ID", "Vehicle ID", "Acceleration", "SlowingPro", "Origin", "Destination", "In Time", "Arrival Time", "Tag", "ClosedVehicle", "PathLength", "Path",
 	}
 	initializeCSV(filename, header)
 }
