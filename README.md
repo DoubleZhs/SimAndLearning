@@ -1,22 +1,6 @@
 # SimAndLearning 交通模拟与学习项目
 
-## 项目介绍
-
-SimAndLearning是一个基于元胞自动机的交通模拟系统，能够模拟多种交通场景，包括道路网络、车辆行为和交通灯控制等。该项目实现了纳格尔模型（Nagel-Schreckenberg model）来模拟车辆行为，并提供了丰富的接口以支持扩展和研究。
-
-## 项目结构
-
-```
-SimAndLearning/
-├── element/              # 基础元素定义
-│   ├── cell.go           # 单元格接口定义
-│   ├── commonCell.go     # 通用单元格实现
-│   ├── link.go           # 链路定义（连接多个单元格）
-│   ├── trafficLightCell.go # 交通灯单元格实现
-│   └── vehicle.go        # 车辆定义及行为逻辑
-├── main.go               # 主程序入口
-└── README.md             # 项目文档
-```
+SimAndLearning是一个GO实现的基于元胞自动机的交通模拟系统，使用仿真数据进行出行时间预测
 
 ## 核心组件
 
@@ -124,7 +108,3 @@ for t := 0; t < simulationTime; t++ {
 - 实现可视化界面
 - 集成机器学习算法优化交通控制
 - 添加并行处理提高大规模模拟性能
-
-## 许可证
-
-[添加许可证信息] 
